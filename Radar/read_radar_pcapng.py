@@ -1,11 +1,14 @@
 from scapy.all import rdpcap, UDP, IP
 import numpy as np
+import pyshark
 
 # Load PCAP file
-nb_file = "11"
-pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
-packets = rdpcap(pcap_file)
-rdc_file = f"data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+nb_file = "01"
+# pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
+pcap_file = f"../Fusion/captures/radar_20250214_120701.pcapng"  # Replace with your PCAP file path
+# packets = rdpcap(pcap_file)
+packets = pyshark.FileCapture(pcap_file)
+rdc_file = f"../Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
 
 # Define parameters
 IP_SOURCE = "192.168.11.11"
@@ -36,18 +39,22 @@ def extract_header(data):
     return np.array([imag_offset, real_offset, range_gate_offset, doppler_bin_offset, rx_channel_offset, chirp_type_offset, range_gates, first_range_gate, doppler_bins, rx_channels, chirp_types, element_size, element_type])
     
 def extract_properties(data):
-    frame_counter  = np.frombuffer(data[14:18], dtype=dt_uint32)
+    frame_counter  = np.frombuffer(data[14:18], dtype=dt_uint32)[0]
     properties = data[22+24:]
     properties = np.frombuffer(properties, dtype=dt_float32)
 
     # Return np array to be saved
     return (frame_counter, properties)
 
+print(len(packets))
+print(packets[0].udp.port)
+exit()
+
 # Extract radar cube packets from PCAP
 rc_udp_packets = [pkt for pkt in packets if UDP in pkt and pkt[UDP].dport == RADAR_CUBE_UDP_PORT and pkt[IP].src == IP_SOURCE and pkt[IP].dst == IP_DEST]
 # Extract bin properties packets from PCAP
 bp_udp_packets = [pkt for pkt in packets if UDP in pkt and pkt[UDP].dport == BIN_PROPERTIES_UDP_PORT and pkt[IP].src == IP_SOURCE and pkt[IP].dst == IP_DEST]
-
+print(len(rc_udp_packets), len(bp_udp_packets))
 if not rc_udp_packets or not bp_udp_packets:
     raise ValueError("No UDP packets found on port 50005|50063")
 print(f"Radar Cube Packets: {len(rc_udp_packets)}, Bin Properties Packets: {len(bp_udp_packets)}")
@@ -61,26 +68,27 @@ fields = extract_header(first_payload)
 print(fields)
 
 all_properties = []
+all_frames_counter = []
 for i in range(len(bp_udp_packets)):
     property_payload = bytes(bp_udp_packets[i][UDP].payload)
-    all_properties.append(extract_properties(property_payload))
-print(f"Properties shape: {len(all_properties)}")
-# properties = np.mean(all_properties, axis=0)
+    frame_counter, properties = extract_properties(property_payload)
+    all_frames_counter.append(frame_counter)
+    all_properties.append(properties)
+
 # Fill missing properties
 for i in range(len(all_properties)-1):
-    current_frame, current_properties = all_properties[i]
-    next_frame, next_properties = all_properties[i+1]
+    current_frame, current_properties = all_frames_counter[i], all_properties[i]
+    next_frame, next_properties = all_frames_counter[i+1], all_properties[i+1]
     # Check for missing frames
     if next_frame - current_frame > 1:
         nb_missing_frames = next_frame - current_frame - 1
         delta_properties = (next_properties - current_properties) / nb_missing_frames
         for j in range(current_frame+1, next_frame):
-            all_properties.insert(i+1, (j, current_properties + delta_properties * (j - current_frame)))
+            all_properties.insert(i+1, current_properties + delta_properties * (j - current_frame))
             print(f"Missing frame: {j}")
-first_property_frame, first_properties = all_properties[0]
-print(all_properties)
-exit(0)
-all_properties = np.array(all_properties)[:,1]
+first_property_frame = all_frames_counter[0]
+first_properties = all_properties[0]
+print(f"First property frame :{first_property_frame}")
 print(f"Properties: {all_properties}")
 
 
@@ -106,7 +114,6 @@ def process_radar_cube_data(radar_data):
     radar_cube = radar_cube.reshape((N_CHIRP_TYPES, N_RANGE_GATES, N_RX_CHANNELS, N_DOPPLER_BINS, 2))
     # Transpose to (range gate, doppler, rx, chirp)
     radar_cube = np.transpose(radar_cube, (1, 3, 2, 0, 4))
-    radar_cube = np.flip(radar_cube, axis=0)
 
     # Extract real and imaginary parts
     real_part = radar_cube[..., 0]
@@ -124,12 +131,13 @@ def process_radar_cube_data(radar_data):
 # Process radar cube data
 radar_cube_datas = []
 timestamps = []
-first_radar_cube_frame = np.frombuffer(rc_udp_packets[0][UDP].payload.load[14:18], dtype=dt_uint32)
+first_radar_cube_frame = np.frombuffer(rc_udp_packets[0][UDP].payload.load[14:18], dtype=dt_uint32)[0]
+frame_diff = first_radar_cube_frame - first_property_frame
+print(f"First Radar Cube Frame: {first_radar_cube_frame}, First Property Frame: {first_property_frame}, Frame Diff: {frame_diff}")
 if first_property_frame < first_radar_cube_frame:
-    all_properties = all_properties[first_radar_cube_frame-first_property_frame:]
+    all_properties = all_properties[frame_diff:]
 else:
-    print(first_radar_cube_frame, first_property_frame)
-    for i in range(int(first_radar_cube_frame)-int(first_property_frame)):
+    for i in range(frame_diff):
         all_properties.insert(0, first_properties)
         print(f"Missing property frame: {first_radar_cube_frame-i}")
 i = 0
@@ -137,7 +145,7 @@ nb_packets = len(rc_udp_packets)
 while i<nb_packets:
     radar_cube_data = bytearray(rc_udp_packets[i][UDP].payload.load[22+64:])
     current_frame = rc_udp_packets[i][UDP].payload.load[14:18]
-    timestamp = np.frombuffer(rc_udp_packets[i][UDP].payload.load[30:38], dtype=dt_uint64)
+    timestamp = np.frombuffer(rc_udp_packets[i][UDP].payload.load[30:38], dtype=dt_uint64)[0]
     i+=1
     while i<nb_packets and rc_udp_packets[i][UDP].payload.load[18] != 0x01 and rc_udp_packets[i][UDP].payload.load[14:18] == current_frame:
         radar_cube_data.extend(rc_udp_packets[i][UDP].payload.load[22:])
@@ -158,10 +166,11 @@ if (len(radar_cube_datas) != len(all_properties)):
     print(f"Filled Properties: {len(all_properties)}")
 
 # Save all datas
-# with open(rdc_file, "wb") as f:
-#     np.save(f, fields)
-#     np.save(f, all_properties)
-#     np.save(f, timestamps)
-#     np.save(f, len(radar_cube_datas))
-#     for i in range(len(radar_cube_datas)):
-#         np.save(f, radar_cube_datas[i])
+with open(rdc_file, "wb") as f:
+    np.save(f, fields)
+    np.save(f, timestamps)
+    np.save(f, len(radar_cube_datas))
+    for i in range(len(all_properties)):
+        np.save(f, all_properties[i])
+    for i in range(len(radar_cube_datas)):
+        np.save(f, radar_cube_datas[i])
