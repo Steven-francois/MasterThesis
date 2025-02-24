@@ -1,6 +1,8 @@
+import numpy as np
+
 class RadarPacketReader:
-    def __init__(self, file_path):
-        self.file_path = file_path
+    def __init__(self, filename):
+        self.filename = filename
         self.fields = None
         self.timestamps = None
         self.nb_frames = None
@@ -20,10 +22,26 @@ class RadarPacketReader:
         pass
     
     def extract_header(data):
-        pass
+        data_ = data[22:] # Skip the first 22 bytes
+        header_size = 64
+        header = data_[24:header_size] # Extract the header
+        offsets = header[:24]
+        imag_offset, real_offset, range_gate_offset, doppler_bin_offset, rx_channel_offset, chirp_type_offset = np.frombuffer(offsets, dtype=dt_uint32)
+        indexes = header[24:30]
+        indexes = np.frombuffer(indexes, dtype=dt_uint16)
+        range_gates, first_range_gate, doppler_bins = indexes
+        rx_channels, chirp_types, element_size, element_type = header[30:34]
+        
+        # Return np array to be saved
+        return np.array([imag_offset, real_offset, range_gate_offset, doppler_bin_offset, rx_channel_offset, chirp_type_offset, range_gates, first_range_gate, doppler_bins, rx_channels, chirp_types, element_size, element_type])
     
     def extract_radar_cube_data(data):
         pass
     
     def extract_properties(data):
-        pass
+        frame_counter  = np.frombuffer(data[14:18], dtype=dt_uint32)[0]
+        properties = data[22+24:]
+        properties = np.frombuffer(properties, dtype=dt_float32)
+
+        # Return np array to be saved
+        return (frame_counter, properties)
