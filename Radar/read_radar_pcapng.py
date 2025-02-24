@@ -3,12 +3,13 @@ import numpy as np
 import pyshark
 
 # Load PCAP file
-nb_file = "01"
-# pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
-pcap_file = f"../Fusion/captures/radar_20250214_120701.pcapng"  # Replace with your PCAP file path
-# packets = rdpcap(pcap_file)
-packets = pyshark.FileCapture(pcap_file)
-rdc_file = f"../Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+nb_file = "21"
+pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
+# pcap_file = f"../Fusion/captures/radar_20250214_120701.pcapng"  # Replace with your PCAP file path
+packets = rdpcap(pcap_file)
+# packets = pyshark.FileCapture(pcap_file)
+rdc_file = f"../data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+# rdc_file = f"../Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
 
 # Define parameters
 IP_SOURCE = "192.168.11.11"
@@ -46,9 +47,6 @@ def extract_properties(data):
     # Return np array to be saved
     return (frame_counter, properties)
 
-print(len(packets))
-print(packets[0].udp.port)
-exit()
 
 # Extract radar cube packets from PCAP
 rc_udp_packets = [pkt for pkt in packets if UDP in pkt and pkt[UDP].dport == RADAR_CUBE_UDP_PORT and pkt[IP].src == IP_SOURCE and pkt[IP].dst == IP_DEST]
@@ -89,7 +87,6 @@ for i in range(len(all_properties)-1):
 first_property_frame = all_frames_counter[0]
 first_properties = all_properties[0]
 print(f"First property frame :{first_property_frame}")
-print(f"Properties: {all_properties}")
 
 
 # Define radar cube dimensions
