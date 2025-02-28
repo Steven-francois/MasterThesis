@@ -4,9 +4,9 @@ import matplotlib.animation as animation
 import os
 from datetime import datetime
 
-nb_file = "12"
-rdc_file = f"../Radar/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
-image_folder = "../Camera/captures2/"
+nb_file = "09"
+rdc_file = f"Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+image_folder = "Fusion/captures/camera_rgba/"
 
 image_filenames = os.listdir(image_folder)
 images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%d_%H-%M-%S-%f").timestamp() for filename in image_filenames])
@@ -14,7 +14,7 @@ images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%
 # temp_timestamps = np.append(temp_timestamps[0], temp_timestamps[:-1])
 # image_frame_timestamps = images_timestamps - temp_timestamps
 image_frame_timestamps = images_timestamps - images_timestamps[0]
-os.makedirs(f"plots/fusion{nb_file}", exist_ok=True)
+os.makedirs(f"Fusion/plots/fusion{nb_file}", exist_ok=True)
 
 
 with open(rdc_file, 'rb') as f:
@@ -125,7 +125,7 @@ def update(frame):
     return img, timestamp_text
 
 def animate():
-    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
+    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=30)
     plt.show()
 
 def save():
@@ -153,10 +153,11 @@ def save_png():
         yt_top = N_RANGE_GATES*RANGE_RESOLUTION
         img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         timestamp_text.set_text(f"Frame: {frame}")
-        plt.savefig(f"plots/fusion{nb_file}/f{frame}.png")
+        plt.savefig(f"Fusion/plots/fusion{nb_file}/f{frame}.png")
 
 
 if __name__ == "__main__":
     # save()
+    save_png()
+    rdm_idx = 0
     animate()
-    # save_png()
