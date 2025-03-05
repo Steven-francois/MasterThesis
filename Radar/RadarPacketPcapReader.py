@@ -80,14 +80,14 @@ class RadarPacketPcapReader(RadarPacketReader):
     def fill_properties(self):
         self.all_properties = []
         all_frames_counter = []
-        for i in range(len(self.properties_packets)):
+        for i in tqdm(range(len(self.properties_packets)), desc="Extracting Properties"):
             property_payload = bytes(self._udp_payload(self.properties_packets[i]))
             frame_counter, properties = self.extract_properties(property_payload)
             all_frames_counter.append(frame_counter)
             self.all_properties.append(properties)
 
         # Fill missing properties
-        for i in range(len(self.all_properties)-1):
+        for i in tqdm(range(len(self.all_properties)-1), desc="Filling Properties"):
             current_frame, current_properties = all_frames_counter[i], self.all_properties[i]
             next_frame, next_properties = all_frames_counter[i+1], self.all_properties[i+1]
             # Check for missing frames
