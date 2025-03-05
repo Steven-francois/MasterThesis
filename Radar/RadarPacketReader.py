@@ -2,9 +2,12 @@ import numpy as np
 from tqdm import tqdm
 
 class RadarPacketReader:
-    def __init__(self, filename, rdc_file="rdc_file.npy"):
+    def __init__(self, filename, rdc_file="rdc_file.npy", max_nb_frames=10000):
         self.filename = filename
         self.rdc_file = rdc_file
+        self.info_file = f"{rdc_file}.info"
+        self.timestamp_file = f"{rdc_file}.timestamp"
+        self.max_nb_frames = max_nb_frames
         self.fields = None
         self.timestamps = None
         self.nb_frames = None
@@ -32,6 +35,11 @@ class RadarPacketReader:
         self.N_CHIRP_TYPES       = None
         self.FIRST_RANGE_GATE    = None
         
+        
+    def allocate_memory(self):
+        self.radar_cube_datas = np.zeros((self.max_nb_frames, self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64)
+        self.timestamps = np.zeros(self.max_nb_frames, dtype=np.uint64)
+        self.time = np.zeros(self.max_nb_frames, dtype=np.float64)
     
     def extract_header(self, data):
         data_ = data[22:] # Skip the first 22 bytes
@@ -81,15 +89,26 @@ class RadarPacketReader:
         # Return np array to be saved
         return (frame_counter, properties)
     
-    def save(self):        
+    def save_radar_cube_data(self):
         with open(self.rdc_file, "wb") as f:
-            np.save(f, self.fields)
+            np.save(f, self.radar_cube_datas)
+        with open(self.timestamp_file, "wb") as f:
             np.save(f, self.timestamps)
+            np.save(f, self.time)
+        
+        self.radar_cube_datas.fill(0)
+        self.timestamps.fill(0)
+        self.time.fill(0)
+    
+    def save(self):        
+        with open(self.info_file, "wb") as f:
+            np.save(f, self.fields)
+            # np.save(f, self.timestamps)
             np.save(f, self.nb_frames)
             for i in tqdm(range(self.nb_frames), desc="Saving Properties"):
                 np.save(f, self.all_properties[i])
-            for i in tqdm(range(self.nb_frames), desc="Saving Radar Cube Data"):
-                np.save(f, self.radar_cube_datas[i])
+            # for i in tqdm(range(self.nb_frames), desc="Saving Radar Cube Data"):
+            #     np.save(f, self.radar_cube_datas[i])
                 
     def load(self):
         with open(self.rdc_file, 'rb') as f:
