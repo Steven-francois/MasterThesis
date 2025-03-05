@@ -12,32 +12,25 @@ class RadarPacketPcapngReader(RadarPacketReader):
         print(f"Reading {filename}")
         self._read_packets()
         self.extract_radar_cube_data()
+        print("Timestamps: ")
+        self.timestamps = np.array(self.timestamps)
+        print((self.timestamps[1:] - self.timestamps[:-1])/1e6)
+        print("Time: ")
+        self.time = np.array(self.time)
+        print(self.time[1:] - self.time[:-1])
+        print("Difference: ")
+        print((self.time[1:] - self.time[:-1]) - (self.timestamps[1:] - self.timestamps[:-1])/1e6)
         self.fill_properties()
         
 
     def _read_packets(self):
         def filter_packets(pkt):
-            # print(pkt)
-            # print(pkt.summary())
-            # print(pkt.haslayer("UDP"))
-            # print(UDP in pkt)
-            # # print(pkt[UDP])
-            # # print(pkt[UDP].dport)
-            # print(IP in pkt)
-            # # print(pkt[IP])
-            # # print(pkt[IP].src)
-            # # print(pkt[IP].dst)
-            # # exit()
             if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
                 self.rdc_packets.append(pkt)
             elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
                 self.properties_packets.append(pkt)
         self.progress_bar(self.pcap, filter_packets, "Filtering packets")
-        # for pkt in self.pcap:
-        #     if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
-        #         self.rdc_packets.append(pkt)
-        #     elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
-        #         self.properties_packets.append(pkt)
+        
         def get_sort_key(pkt):
             payload = pkt[UDP].payload.load
             return (
@@ -65,6 +58,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
     def extract_radar_cube_data(self):
         self.radar_cube_datas = []
         self.timestamps = []
+        self.time = []
         
         i = 0
         nb_packets = len(self.rdc_packets)
@@ -75,19 +69,29 @@ class RadarPacketPcapngReader(RadarPacketReader):
                 
                 radar_cube_data = bytearray(self.rdc_packets[i][UDP].payload.load[22+64:])
                 current_frame = self.rdc_packets[i][UDP].payload.load[14:18]
+                previous_message_id = int.from_bytes(self.rdc_packets[i][UDP].payload.load[10:12], byteorder="big")
                 timestamp = np.frombuffer(self.rdc_packets[i][UDP].payload.load[30:38], dtype=self.dt_uint64)[0]
+                time = float(self.rdc_packets[i].time) #received time
                 i+=1; pbar.update(1)
                 nb_packets_found = 1
                 while i<nb_packets and self.rdc_packets[i][UDP].payload.load[18] != 0x01 and self.rdc_packets[i][UDP].payload.load[14:18] == current_frame:
+                    current_message_id = int.from_bytes(self.rdc_packets[i][UDP].payload.load[10:12], byteorder="big")
+                    if current_message_id > previous_message_id + 1:
+                        for _ in range(previous_message_id+1, current_message_id):
+                            radar_cube_data.extend(bytes(b'\xf0'*1436))
+                        print("+", end="")
+                    previous_message_id = current_message_id
                     radar_cube_data.extend(self.rdc_packets[i][UDP].payload.load[22:])
                     # print(str(self.rdc_packets[i][UDP].payload.load[18]), end="")
                     i+=1; pbar.update(1); nb_packets_found+=1
                 radar_cube_data = self.process_radar_cube_data(radar_cube_data)
                 if radar_cube_data is not None:
                     self.timestamps.append(timestamp)
+                    self.time.append(time)
                     self.radar_cube_datas.append(radar_cube_data)
                 else:
                     self.timestamps.append(0)
+                    self.time.append(0)
                     self.radar_cube_datas.append(np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64))
         self.nb_frames = len(self.radar_cube_datas)
         print(f"\nProcessed Radar Cube Data: {self.nb_frames} frames")
@@ -95,14 +99,14 @@ class RadarPacketPcapngReader(RadarPacketReader):
     def fill_properties(self):
         self.all_properties = []
         all_frames_counter = []
-        for i in range(len(self.properties_packets)):
+        for i in tqdm(range(len(self.properties_packets)), desc="Extracting Properties"):
             property_payload = bytes(self.properties_packets[i][UDP].payload)
             frame_counter, properties = self.extract_properties(property_payload)
             all_frames_counter.append(frame_counter)
             self.all_properties.append(properties)
 
         # Fill missing properties
-        for i in range(len(self.all_properties)-1):
+        for i in tqdm(range(len(self.all_properties)-1), desc="Filling missing properties"):
             current_frame, current_properties = all_frames_counter[i], self.all_properties[i]
             next_frame, next_properties = all_frames_counter[i+1], self.all_properties[i+1]
             # Check for missing frames

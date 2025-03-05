@@ -86,9 +86,9 @@ class RadarPacketReader:
             np.save(f, self.fields)
             np.save(f, self.timestamps)
             np.save(f, self.nb_frames)
-            for i in range(self.nb_frames):
+            for i in tqdm(range(self.nb_frames), desc="Saving Properties"):
                 np.save(f, self.all_properties[i])
-            for i in range(self.nb_frames):
+            for i in tqdm(range(self.nb_frames), desc="Saving Radar Cube Data"):
                 np.save(f, self.radar_cube_datas[i])
                 
     def load(self):
