@@ -4,9 +4,10 @@ import matplotlib.animation as animation
 import os
 from datetime import datetime
 
-nb_file = "09"
+nb_file = "20"
 rdc_file = f"Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
 image_folder = "Fusion/captures/camera_rgba/"
+plot_folder = f"Fusion/plots/fusion{nb_file}"
 
 image_filenames = os.listdir(image_folder)
 images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%d_%H-%M-%S-%f").timestamp() for filename in image_filenames])
@@ -14,7 +15,7 @@ images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%
 # temp_timestamps = np.append(temp_timestamps[0], temp_timestamps[:-1])
 # image_frame_timestamps = images_timestamps - temp_timestamps
 image_frame_timestamps = images_timestamps - images_timestamps[0]
-os.makedirs(f"Fusion/plots/fusion{nb_file}", exist_ok=True)
+os.makedirs(plot_folder, exist_ok=True)
 
 
 with open(rdc_file, 'rb') as f:
@@ -26,7 +27,7 @@ with open(rdc_file, 'rb') as f:
         all_properties = np.append(all_properties, [np.load(f, allow_pickle=True)], axis=0)
     radar_cube_data = np.array([np.load(f, allow_pickle=True)])
     for _ in range(nb_frames-1):
-    # for _ in range(10-1):
+    # for _ in range(200-1):
         radar_cube_data = np.append(radar_cube_data, [np.load(f, allow_pickle=True)], axis=0)
 
 # temp_timestamps = np.array(radar_timestamps)
@@ -108,8 +109,6 @@ def update(frame):
     range_doppler_matrix = radar_cube_data[rdm_idx]
     # if range_doppler_matrix == 0:
     #     return img,
-    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
-    img.set_data(range_doppler_matrix)
     # Define Bin Properties
     properties = all_properties[rdm_idx]
     DOPPLER_RESOLUTION  = properties[0]
@@ -119,31 +118,52 @@ def update(frame):
     xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
     yt_bottom = 0
     yt_top = N_RANGE_GATES*RANGE_RESOLUTION
-    img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+    fill_neg_bins = np.zeros((N_RANGE_GATES, int((xmin-xt_left)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    fill_pos_bins = np.zeros((N_RANGE_GATES, int((xt_right-xmax)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
+    range_doppler_matrix = np.concatenate((fill_pos_bins, range_doppler_matrix, fill_neg_bins), axis=1)
+    img.set_data(range_doppler_matrix)
+    img.set_extent([xmax, xmin, yt_bottom, yt_top])
     timestamp_text.set_text(f"Timestamp: {rdm_idx}")
-    rdm_idx += 1
+    if rdm_idx < len(radar_cube_data)-1:
+        rdm_idx += 1
     return img, timestamp_text
 
 def animate():
-    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=30)
+    ani = animation.FuncAnimation(fig, update, frames=len(image_filenames), interval=30)
     plt.show()
 
 def save():
-    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=150)
+    ani = animation.FuncAnimation(fig, update, frames=len(image_filenames), interval=30)
     # plt.rcParams['animation.ffmpeg_path'] = r'C:\\Users\\openadm\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-7.1-full_build\\bin\\ffmpeg.exe'
     # writervideo = animation.FFMpegWriter(fps=60) 
     # ani.save(f"rdms/rdm{nb_file}.mp4", writer=writervideo)
-    ani.save(f"plot/fusion{nb_file}.mp4", writer="ffmpeg", fps=1)
+    ani.save(f"{plot_folder}/fusion{nb_file}.mp4", writer="ffmpeg", fps=60)
     
 def save_png():
-    for frame in range(len(radar_cube_data)):
-        range_doppler_matrix = radar_cube_data[frame]
+    for frame in range(len(image_filenames)):
+        global rdm_idx
+        if frame == 0:
+            rdm_idx = 0
+        print(f"Frame: {frame}")
+        print(f"RDM Index: {rdm_idx}")
+        print(f"Image Timestamp: {image_frame_timestamps[frame]}")
+        print(f"Radar Timestamp: {radar_frame_timestamps[rdm_idx]}")
+        # Get image data
+        image = np.asarray(plt.imread(image_folder + image_filenames[frame]))
+        img2.set_data(image)
+        ax2.axis('off')
+        if image_frame_timestamps[frame] < radar_frame_timestamps[rdm_idx]:
+            return img, timestamp_text
+        
+        # Get radar cube data
+        range_doppler_matrix = radar_cube_data[rdm_idx]
         # if range_doppler_matrix == 0:
         #     return img,
         range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
         img.set_data(range_doppler_matrix)
         # Define Bin Properties
-        properties = all_properties[frame]
+        properties = all_properties[rdm_idx]
         DOPPLER_RESOLUTION  = properties[0]
         RANGE_RESOLUTION    = properties[1]
         BIN_PER_SPEED       = properties[2]
@@ -152,12 +172,14 @@ def save_png():
         yt_bottom = 0
         yt_top = N_RANGE_GATES*RANGE_RESOLUTION
         img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-        timestamp_text.set_text(f"Frame: {frame}")
-        plt.savefig(f"Fusion/plots/fusion{nb_file}/f{frame}.png")
+        timestamp_text.set_text(f"Timestamp: {rdm_idx}")
+        if rdm_idx < len(radar_cube_data)-1:
+            rdm_idx += 1
+        plt.savefig(f"{plot_folder}/f{frame}.png")
 
 
 if __name__ == "__main__":
     # save()
-    save_png()
-    rdm_idx = 0
+    # save_png()
+    # rdm_idx = 0
     animate()
