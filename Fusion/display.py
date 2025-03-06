@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import os
 from datetime import datetime
+from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 
 nb_file = "20"
-rdc_file = f"Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 image_folder = "Fusion/captures/camera_rgba/"
 plot_folder = f"Fusion/plots/fusion{nb_file}"
 
@@ -18,23 +19,35 @@ image_frame_timestamps = images_timestamps - images_timestamps[0]
 os.makedirs(plot_folder, exist_ok=True)
 
 
-with open(rdc_file, 'rb') as f:
-    fields = np.load(f, allow_pickle=True)
-    radar_timestamps = np.load(f, allow_pickle=True)
-    nb_frames = np.load(f, allow_pickle=True)
-    all_properties = np.array([np.load(f, allow_pickle=True)])
-    for _ in range(nb_frames-1):
-        all_properties = np.append(all_properties, [np.load(f, allow_pickle=True)], axis=0)
-    radar_cube_data = np.array([np.load(f, allow_pickle=True)])
-    for _ in range(nb_frames-1):
-    # for _ in range(200-1):
-        radar_cube_data = np.append(radar_cube_data, [np.load(f, allow_pickle=True)], axis=0)
+rdc_reader = RadarPacketReader("", rdc_file)
+rdc_reader.load()
+fields = rdc_reader.fields
+radar_timestamps = rdc_reader.timestamps
+nb_frames = rdc_reader.nb_frames
+all_properties = rdc_reader.all_properties
+radar_cube_data = rdc_reader.radar_cube_datas
+print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_cube_data)}, Number Properties: {len(all_properties)}")
+
+
+# with open(rdc_file, 'rb') as f:
+#     fields = np.load(f, allow_pickle=True)
+#     radar_timestamps = np.load(f, allow_pickle=True)
+#     nb_frames = np.load(f, allow_pickle=True)
+#     all_properties = np.array([np.load(f, allow_pickle=True)])
+#     for _ in range(nb_frames-1):
+#         all_properties = np.append(all_properties, [np.load(f, allow_pickle=True)], axis=0)
+#     radar_cube_data = np.array([np.load(f, allow_pickle=True)])
+#     for _ in range(nb_frames-1):
+#     # for _ in range(200-1):
+#         radar_cube_data = np.append(radar_cube_data, [np.load(f, allow_pickle=True)], axis=0)
 
 # temp_timestamps = np.array(radar_timestamps)
 # temp_timestamps = np.append(temp_timestamps[0], temp_timestamps[:-1])
 # radar_frame_timestamps = radar_timestamps - temp_timestamps
+non_zero_indices = np.where(radar_timestamps != 0)[0]
+zero_indices = np.where(radar_timestamps == 0)[0]
+radar_timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, radar_timestamps[non_zero_indices])
 radar_frame_timestamps = (radar_timestamps - radar_timestamps[0])/1e6
-
 
 
 

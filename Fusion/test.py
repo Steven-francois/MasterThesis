@@ -6,13 +6,13 @@ import os
 
 def test_RadarPacketReader():
     # Test the RadarPacketPcapngReader class
-    rdc_file = "Fusion/data/radar_cube_data_21"
-    # rdc_reader = RadarPacketReader("Fusion/captures/radar_20250227_171252.pcapng", rdc_file)
-    rdc_reader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
+    rdc_file = "Fusion/data/radar_cube_data_20"
+    rdc_reader = RadarPacketReader("Fusion/captures/radar_20250305_160743.pcapng", rdc_file)
+    # rdc_reader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
     rdc_reader.read()
     # rdc_reader.save()
 
-#StackOerflow: https://stackoverflow.com/questions/552744/how-do-i-profile-memory-usage-in-python
+#StackOverflow: https://stackoverflow.com/questions/552744/how-do-i-profile-memory-usage-in-python
 def display_top(snapshot, key_type='lineno', limit=3):
     snapshot = snapshot.filter_traces((
         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
