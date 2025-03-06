@@ -2,28 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import time
+from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 
-nb_file = "12"
-rdc_file = f"data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+nb_file = "21"
+rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 # rdc_file_bg = f"radar_cube_data_bg{nb_file}.npy" # Replace with your output file path
 
-now = time.time()
-with open(rdc_file, 'rb') as f:
-    fields = np.load(f, allow_pickle=True)
-    timestamps = np.load(f, allow_pickle=True)
-    nb_frames = np.load(f, allow_pickle=True)
-    all_properties = np.array([np.load(f, allow_pickle=True)])
-    for _ in range(nb_frames-1):
-        all_properties = np.append(all_properties, [np.load(f, allow_pickle=True)], axis=0)
-    # properties = np.mean(all_properties, axis=0)
-    # print(f"Fields: {fields}, Properties: {properties}, Timestamps: {timestamps}, Number of Frames: {nb_frames}")
-    radar_cube_data = np.array([np.load(f, allow_pickle=True)])
-    for _ in range(nb_frames-1):
-    # for _ in range(10-1):
-        radar_cube_data = np.append(radar_cube_data, [np.load(f, allow_pickle=True)], axis=0)
-    # radar_cube_data = np.load(f, allow_pickle=True)
-print(f"Time to load data: {time.time() - now}")
-now = time.time()
+rdc_reader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
+rdc_reader.load()
+fields = rdc_reader.fields
+timestamps = rdc_reader.timestamps
+nb_frames = rdc_reader.nb_frames
+all_properties = rdc_reader.all_properties
+radar_cube_data = rdc_reader.radar_cube_datas
+print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_cube_data)}, Number Properties: {len(all_properties)}")
+
+
+
 
 
 # with open(rdc_file_bg, 'rb') as f:
@@ -189,13 +184,6 @@ def plot_angles_for_0_speed():
 
 if __name__ == "__main__":
     # save()
-    # now = time.time()
-    # print(f"Before animate: {end_before_animate-end_load}")
-    # print(f"Before animate: {time.time()-start}")
-    print(f"Before animate: {time.time()-now}")
-    now = time.time()
     animate()
-    print(f"After animate: {time.time()-now}")
-    now = time.time()
     # plot_angles_for_0_speed()
     # save_png()

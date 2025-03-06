@@ -2,11 +2,11 @@ import numpy as np
 from tqdm import tqdm
 
 class RadarPacketReader:
-    def __init__(self, filename, rdc_file="rdc_file.npy", max_nb_frames=10000):
+    def __init__(self, filename, output_name="rdc_file", max_nb_frames=2):
         self.filename = filename
-        self.rdc_file = rdc_file
-        self.info_file = f"{rdc_file}.info"
-        self.timestamp_file = f"{rdc_file}.timestamp"
+        self.rdc_file = f"{output_name}.npy"
+        self.info_file = f"{output_name}_info.npy"
+        self.timestamp_file = f"{output_name}_timestamp.npy"
         self.max_nb_frames = max_nb_frames
         self.fields = None
         self.timestamps = None
@@ -90,15 +90,23 @@ class RadarPacketReader:
         return (frame_counter, properties)
     
     def save_radar_cube_data(self):
-        with open(self.rdc_file, "wb") as f:
+        with open(self.rdc_file, "ab") as f:
             np.save(f, self.radar_cube_datas)
-        with open(self.timestamp_file, "wb") as f:
+        with open(self.timestamp_file, "ab") as f:
             np.save(f, self.timestamps)
-            np.save(f, self.time)
+            # np.save(f, self.time)
         
         self.radar_cube_datas.fill(0)
         self.timestamps.fill(0)
         self.time.fill(0)
+
+    def create_files(self):
+        f = open(self.rdc_file, "wb")
+        f.close()
+        f = open(self.info_file, "wb")
+        f.close()
+        f = open(self.timestamp_file, "wb")
+        f.close()
     
     def save(self):        
         with open(self.info_file, "wb") as f:
@@ -111,17 +119,29 @@ class RadarPacketReader:
             #     np.save(f, self.radar_cube_datas[i])
                 
     def load(self):
-        with open(self.rdc_file, 'rb') as f:
+        with open(self.info_file, 'rb') as f:
             self.fields = np.load(f, allow_pickle=True)
-            self.timestamps = np.load(f, allow_pickle=True)
+            # self.timestamps = np.load(f, allow_pickle=True)
             self.nb_frames = np.load(f, allow_pickle=True)
+            print(f"Number of Frames: {self.nb_frames}")
             self.all_properties = np.array([np.load(f, allow_pickle=True)])
             for _ in range(self.nb_frames-1):
                 self.all_properties = np.append(self.all_properties, [np.load(f, allow_pickle=True)], axis=0)
-            self.radar_cube_datas = np.array([np.load(f, allow_pickle=True)])
-            for _ in range(self.nb_frames-1):
-                self.radar_cube_datas = np.append(self.radar_cube_datas, [np.load(f, allow_pickle=True)], axis=0)
-                
+            # self.radar_cube_datas = np.array([np.load(f, allow_pickle=True)])
+            # for _ in range(self.nb_frames-1):
+            #     self.radar_cube_datas = np.append(self.radar_cube_datas, [np.load(f, allow_pickle=True)], axis=0)
+        with open(self.timestamp_file, 'rb') as f:
+            self.timestamps = [np.load(f, allow_pickle=True) for _ in range(self.nb_frames//self.max_nb_frames)]
+            if self.nb_frames % self.max_nb_frames != 0:
+                self.timestamps.append(np.load(f, allow_pickle=True))
+            # self.time = np.load(f, allow_pickle=True)
+        with open(self.rdc_file, 'rb') as f:
+            self.radar_cube_datas = [np.load(f, allow_pickle=True) for _ in range(self.nb_frames//self.max_nb_frames)]
+            if self.nb_frames % self.max_nb_frames != 0:
+                self.radar_cube_datas.append(np.load(f, allow_pickle=True))
+            self.radar_cube_datas = np.concatenate(self.radar_cube_datas, axis=0)
+            self.radar_cube_datas = self.radar_cube_datas[:self.nb_frames]
+            
     def progress_bar(self, iterable, func, description):
         for i in tqdm(iterable, desc=description):
             func(i)

@@ -4,14 +4,17 @@ import numpy as np
 
 
 class RadarPacketPcapngReader(RadarPacketReader):
-    def __init__(self, filename, rdc_file="rdc_file.npy"):
-        super().__init__(filename, rdc_file)
-        self.pcap = rdpcap(filename, 1000000)
+    def __init__(self, filename, output_name="rdc_file"):
+        super().__init__(filename, output_name)
         self.rdc_packets = []
         self.properties_packets = []
-        print(f"Reading {filename}")
+    
+    def read(self):
+        print(f"Reading {self.filename}")
+        self.pcap = rdpcap(self.filename)
         self._read_packets()
         self.allocate_memory()
+        self.create_files()
         self.extract_radar_cube_data()
         print("Timestamps: ")
         self.timestamps = np.array(self.timestamps)
@@ -22,6 +25,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
         print("Difference: ")
         print((self.time[1:] - self.time[:-1]) - (self.timestamps[1:] - self.timestamps[:-1])/1e6)
         self.fill_properties()
+        self.save()
         
 
     def _read_packets(self):
@@ -107,7 +111,8 @@ class RadarPacketPcapngReader(RadarPacketReader):
                 
                 if self.nb_frames % self.max_nb_frames == 0:
                     self.save_radar_cube_data()
-        self.nb_frames = len(self.radar_cube_datas)
+        if self.nb_frames % self.max_nb_frames != 0:
+            self.save_radar_cube_data()
         print(f"\nProcessed Radar Cube Data: {self.nb_frames} frames")
         
     def fill_properties(self):
@@ -144,9 +149,9 @@ class RadarPacketPcapngReader(RadarPacketReader):
                 self.all_properties.insert(0, first_properties)
                 print(f"Missing property frame: {first_radar_cube_frame-i}")
                 
-        if (len(self.radar_cube_datas) != len(self.all_properties)):
-            print(f"Radar Cube Data: {len(self.radar_cube_datas)}, Properties: {len(self.all_properties)}")
-            for i in range(len(self.radar_cube_datas)-len(self.all_properties)):
+        if (self.nb_frames != len(self.all_properties)):
+            print(f"Radar Cube Data: {self.nb_frames}, Properties: {len(self.all_properties)}")
+            for i in range(self.nb_frames-len(self.all_properties)):
                 self.all_properties.insert(-1, self.all_properties[-1])
             print(f"Filled Properties: {len(self.all_properties)}")
         
