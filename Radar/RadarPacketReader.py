@@ -89,6 +89,11 @@ class RadarPacketReader:
         # Return np array to be saved
         return (frame_counter, properties)
     
+    def interpolate_timestamps(self):
+        non_zero_indices = np.where(self.timestamps != 0)[0]
+        zero_indices = np.where(self.timestamps == 0)[0]
+        self.timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, self.timestamps[non_zero_indices])
+    
     def save_radar_cube_data(self):
         with open(self.rdc_file, "ab") as f:
             np.save(f, self.radar_cube_datas)
@@ -134,6 +139,8 @@ class RadarPacketReader:
             self.timestamps = [np.load(f, allow_pickle=True) for _ in range(self.nb_frames//self.max_nb_frames)]
             if self.nb_frames % self.max_nb_frames != 0:
                 self.timestamps.append(np.load(f, allow_pickle=True))
+            self.timestamps = np.concatenate(self.timestamps, axis=0)
+            self.timestamps = self.timestamps[:self.nb_frames]
             # self.time = np.load(f, allow_pickle=True)
         with open(self.rdc_file, 'rb') as f:
             self.radar_cube_datas = [np.load(f, allow_pickle=True) for _ in range(self.nb_frames//self.max_nb_frames)]
