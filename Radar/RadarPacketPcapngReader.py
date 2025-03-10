@@ -11,7 +11,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
     
     def read(self):
         print(f"Reading {self.filename}")
-        self.pcap = rdpcap(self.filename)
+        self.pcap = rdpcap(self.filename, 1000000)
         self._read_packets()
         self.allocate_memory()
         self.create_files()
@@ -85,7 +85,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     current_message_id = int.from_bytes(self.rdc_packets[i][UDP].payload.load[10:12], byteorder="big")
                     if current_message_id > previous_message_id + 1:
                         for _ in range(previous_message_id+1, current_message_id):
-                            radar_cube_data.extend(bytes(b'\xf0'*1436))
+                            radar_cube_data.extend(bytes(b'\x00'*1436))
                         print("+", end="")
                     previous_message_id = current_message_id
                     radar_cube_data.extend(self.rdc_packets[i][UDP].payload.load[22:])
@@ -93,19 +93,15 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     i+=1; pbar.update(1); nb_packets_found+=1
                 radar_cube_data = self.process_radar_cube_data(radar_cube_data)
                 nb_frame  = self.nb_frames % self.max_nb_frames
+                # self.timestamps.append(timestamp)
+                # self.time.append(time)
+                self.timestamps[nb_frame] = timestamp
+                self.time[nb_frame] = time
                 if radar_cube_data is not None:
-                    # self.timestamps.append(timestamp)
-                    # self.time.append(time)
                     # self.radar_cube_datas.append(radar_cube_data)
-                    self.timestamps[nb_frame] = timestamp
-                    self.time[nb_frame] = time
                     self.radar_cube_datas[nb_frame] = radar_cube_data
                 else:
-                    # self.timestamps.append(0)
-                    # self.time.append(0)
                     # self.radar_cube_datas.append(np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64))
-                    self.timestamps[nb_frame] = 0
-                    self.time[nb_frame] = 0
                     self.radar_cube_datas[nb_frame] = np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64)
                 self.nb_frames += 1
                 
