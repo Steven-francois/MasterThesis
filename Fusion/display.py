@@ -22,9 +22,11 @@ os.makedirs(plot_folder, exist_ok=True)
 rdc_reader = RadarPacketReader("", rdc_file)
 rdc_reader.load()
 fields = rdc_reader.fields
+rdc_reader.interpolate_timestamps()
 radar_timestamps = rdc_reader.timestamps
 nb_frames = rdc_reader.nb_frames
 all_properties = rdc_reader.all_properties
+print(all_properties)
 radar_cube_data = rdc_reader.radar_cube_datas
 print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_cube_data)}, Number Properties: {len(all_properties)}")
 
@@ -44,9 +46,6 @@ print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_
 # temp_timestamps = np.array(radar_timestamps)
 # temp_timestamps = np.append(temp_timestamps[0], temp_timestamps[:-1])
 # radar_frame_timestamps = radar_timestamps - temp_timestamps
-non_zero_indices = np.where(radar_timestamps != 0)[0]
-zero_indices = np.where(radar_timestamps == 0)[0]
-radar_timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, radar_timestamps[non_zero_indices])
 radar_frame_timestamps = (radar_timestamps - radar_timestamps[0])/1e6
 
 
@@ -129,14 +128,16 @@ def update(frame):
     BIN_PER_SPEED       = properties[2]
     xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
     xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
+    print(f"xt_left: {xt_left}, xt_right: {xt_right}")
     yt_bottom = 0
     yt_top = N_RANGE_GATES*RANGE_RESOLUTION
-    fill_neg_bins = np.zeros((N_RANGE_GATES, int((xmin-xt_left)//DOPPLER_RESOLUTION)), dtype=np.float64)
-    fill_pos_bins = np.zeros((N_RANGE_GATES, int((xt_right-xmax)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    # fill_neg_bins = np.zeros((N_RANGE_GATES, int((xmin-xt_left)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    # fill_pos_bins = np.zeros((N_RANGE_GATES, int((xt_right-xmax)//DOPPLER_RESOLUTION)), dtype=np.float64)
     range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
-    range_doppler_matrix = np.concatenate((fill_pos_bins, range_doppler_matrix, fill_neg_bins), axis=1)
+    # range_doppler_matrix = np.concatenate((fill_pos_bins, range_doppler_matrix, fill_neg_bins), axis=1)
     img.set_data(range_doppler_matrix)
-    img.set_extent([xmax, xmin, yt_bottom, yt_top])
+    # img.set_extent([xmax, xmin, yt_bottom, yt_top])
+    img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
     timestamp_text.set_text(f"Timestamp: {rdm_idx}")
     if rdm_idx < len(radar_cube_data)-1:
         rdm_idx += 1
