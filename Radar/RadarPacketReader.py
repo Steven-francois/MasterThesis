@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 
 class RadarPacketReader:
-    def __init__(self, filename, output_name="rdc_file", max_nb_frames=2):
+    def __init__(self, filename, output_name="rdc_file", max_nb_frames=100):
         self.filename = filename
         self.rdc_file = f"{output_name}.npy"
         self.info_file = f"{output_name}_info.npy"
