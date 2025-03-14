@@ -1,3 +1,5 @@
-*/captures/*
+*/captures*/*
 */data/*
 Radar/rdms/*
+*/plots/*
+*/__pycache__/*
