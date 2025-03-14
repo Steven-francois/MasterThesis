@@ -1,15 +1,16 @@
 from scapy.all import rdpcap, UDP, IP
 import numpy as np
-import pyshark
+
 
 # Load PCAP file
-nb_file = "21"
-pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
-# pcap_file = f"../Fusion/captures/radar_20250214_120701.pcapng"  # Replace with your PCAP file path
-packets = rdpcap(pcap_file)
+nb_file = "06"
+# pcap_file = f"captures/radar_log_{nb_file}.pcapng"  # Replace with your PCAP file path
+# pcap_file = f"../Fusion/captures/radar_20250217_164953.pcap"  # Replace with your PCAP file path
+pcap_file = f"../Fusion/captures2/radar_20250214_120701.pcap"  # Replace with your PCAP file path
+packets = rdpcap(pcap_file,10000)
 # packets = pyshark.FileCapture(pcap_file)
-rdc_file = f"../data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
-# rdc_file = f"../Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+# rdc_file = f"../data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
+rdc_file = f"../Fusion/data/radar_cube_data_{nb_file}.npy" # Replace with your output file path
 
 # Define parameters
 IP_SOURCE = "192.168.11.11"
@@ -144,9 +145,12 @@ while i<nb_packets:
     current_frame = rc_udp_packets[i][UDP].payload.load[14:18]
     timestamp = np.frombuffer(rc_udp_packets[i][UDP].payload.load[30:38], dtype=dt_uint64)[0]
     i+=1
+    nb_packets_found = 1
     while i<nb_packets and rc_udp_packets[i][UDP].payload.load[18] != 0x01 and rc_udp_packets[i][UDP].payload.load[14:18] == current_frame:
         radar_cube_data.extend(rc_udp_packets[i][UDP].payload.load[22:])
-        i+=1
+        i+=1; nb_packets_found+=1
+    if i<nb_packets:
+        print(f"Flag: {rc_udp_packets[i][UDP].payload.load[18]}, Current frame: {np.frombuffer(current_frame, dtype=dt_uint32)}, Frame: {np.frombuffer(rc_udp_packets[i][UDP].payload.load[14:18], dtype=dt_uint32)}, Packets: {nb_packets_found}")
     radar_cube_data = process_radar_cube_data(radar_cube_data)
     if radar_cube_data is not None:
         timestamps.append(timestamp)
