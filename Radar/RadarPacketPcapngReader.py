@@ -4,14 +4,14 @@ import numpy as np
 
 
 class RadarPacketPcapngReader(RadarPacketReader):
-    def __init__(self, filename, output_name="rdc_file"):
+    def __init__(self, filename=None, output_name="rdc_file"):
         super().__init__(filename, output_name)
         self.rdc_packets = []
         self.properties_packets = []
     
     def read(self):
         print(f"Reading {self.filename}")
-        self.pcap = rdpcap(self.filename, 1000000)
+        # self.pcap = rdpcap(self.filename)
         self._read_packets()
         self.allocate_memory()
         self.create_files()
@@ -29,13 +29,13 @@ class RadarPacketPcapngReader(RadarPacketReader):
         
 
     def _read_packets(self):
-        # with PcapReader(self.filename) as pcap:
+        with PcapReader(self.filename) as pcap:
             def filter_packets(pkt):
                 if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
                     self.rdc_packets.append(pkt)
                 elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
                     self.properties_packets.append(pkt)
-            self.progress_bar(self.pcap, filter_packets, "Filtering packets")
+            self.progress_bar(pcap, filter_packets, "Filtering packets")
             
             def get_sort_key(pkt):
                 payload = pkt[UDP].payload.load
@@ -89,6 +89,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                         print("+", end="")
                     previous_message_id = current_message_id
                     radar_cube_data.extend(self.rdc_packets[i][UDP].payload.load[22:])
+                    time = min(time, float(self.rdc_packets[i].time))
                     # print(str(self.rdc_packets[i][UDP].payload.load[18]), end="")
                     i+=1; pbar.update(1); nb_packets_found+=1
                 radar_cube_data = self.process_radar_cube_data(radar_cube_data)
