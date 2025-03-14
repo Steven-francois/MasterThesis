@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import open3d as o3d
 import time
+from tqdm import tqdm
+
 
 # Read the data
-df = pd.read_csv('combine0715.csv')
+df = pd.read_csv('Fusion/data/combi_20.csv')
 Ids = df['ID'].unique()
 x_min = df['X'].min()
 x_max = df['X'].max()
@@ -26,14 +28,18 @@ intensity_normalized = (intensity - intensity.min()) / (intensity.max() - intens
 colors = plt.cm.viridis(intensity_normalized)[:, :3]  # Use viridis colormap
 geometry.colors = o3d.utility.Vector3dVector(colors)
 vis.add_geometry(geometry)
-filtered_df_list = [df[df['ID'] == Ids[i]] for i in range(len(Ids))]
+# filtered_df_list = [df[df['ID'] == Ids[i]] for i in range(len(Ids))]
+# filtered_df_list = []
+# for i in tqdm(range(100)):
+#     temp_df = df[df['ID'] == Ids[i]]
+#     filtered_df_list.append(temp_df)
+#     df = df.drop(temp_df.index)
 
-for i in range(len(Ids)):
-    print(Ids[i])
+for i in range(100):
     now = time.time()
-    # filtered_df = df[df['ID'] == Ids[i]]
-    points = filtered_df_list[i][['X', 'Y', 'Z']].values
-    intensity = filtered_df_list[i]['Intensity'].values
+    filtered_df = df[df['ID'] == Ids[i]]
+    points = filtered_df[['X', 'Y', 'Z']].values
+    intensity = filtered_df['Intensity'].values
     geometry.points = o3d.utility.Vector3dVector(points)
     intensity_normalized = (intensity - intensity.min()) / (intensity.max() - intensity.min())
     colors = plt.cm.viridis(intensity_normalized)[:, :3]  # Use viridis colormap
