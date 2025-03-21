@@ -4,7 +4,7 @@ import matplotlib.animation as animation
 import time
 from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 
-nb_file = "21"
+nb_file = "30"
 rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 # rdc_file_bg = f"radar_cube_data_bg{nb_file}.npy" # Replace with your output file path
 
@@ -68,25 +68,30 @@ ymax = 98
 
 
 # Setup Matplotlib figure
-fig, ax = plt.subplots(figsize=(10, 6))
+fig, (ax, ax2) = plt.subplots(1, 2)
 img = ax.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
+img2 = ax2.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
 ax.set_xlabel("Doppler Bins")
 ax.set_ylabel("Range Gates")
 ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
 ax.set_title("Real-Time Range-Doppler Map")
+ax2.set_xlabel("Doppler Bins")
+ax2.set_ylabel("Range Gates")
+ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+ax2.set_title("Real-Time Range-Doppler Map")
 fig.colorbar(img, label="Magnitude (dB)")
 timestamp_text = ax.text(xmin, ymin, "", color="white", fontsize=12, bbox=dict(facecolor='black', alpha=0.5))
 
 def process_radar_cube_data(range_doppler_matrix, angle=False):
-    if angle:
-        range_angle_matrix = np.fft.fftshift(np.fft.fft(range_doppler_matrix[:,N_DOPPLER_BINS//2,:,0], axis=1), axes=1)
-        return np.abs(range_angle_matrix)
     
     # Sum over RX channels and chirps
     # range_doppler_matrix = np.fft.fft(range_doppler_matrix, axis=1)
     # range_doppler_matrix = np.sum(range_doppler_matrix[:,:,:,0], axis=2)
     # print(range_doppler_matrix.shape)
-    range_doppler_matrix = range_doppler_matrix[:, :, 0, 0]
+    if angle:
+        range_doppler_matrix = range_doppler_matrix[:, :, 0, 0]
+    else:
+        range_doppler_matrix = range_doppler_matrix[:, :, 0, 1]
 
 
     # Apply FFT along the Doppler axis
@@ -99,11 +104,14 @@ def process_radar_cube_data(range_doppler_matrix, angle=False):
     return 20 * np.log10(np.abs(range_doppler_matrix) + 1e-6)
 
 def update(frame):
-    range_doppler_matrix = radar_cube_data[frame]
+    range_doppler_matrix_ = radar_cube_data[frame]
     # if range_doppler_matrix == 0:
     #     return img,
-    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
+    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix_)
+    range_doppler_matrix2 = process_radar_cube_data(range_doppler_matrix_, True)
+    
     img.set_data(range_doppler_matrix)
+    img2.set_data(range_doppler_matrix2)
     # Define Bin Properties
     properties = all_properties[frame]
     DOPPLER_RESOLUTION  = properties[0]
@@ -114,14 +122,13 @@ def update(frame):
     yt_bottom = 0
     yt_top = N_RANGE_GATES*RANGE_RESOLUTION
     img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+    img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
     timestamp_text.set_text(f"Timestamp: {frame}")
-    return img, timestamp_text
+    return img, img2, timestamp_text
 
 def animate():
-    global now
     ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
-    print(f"Before animate: {time.time()-now}")
-    now = time.time()
+
     plt.show()
 
 def save():
