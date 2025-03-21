@@ -7,6 +7,7 @@ import numpy as np
 import multiprocessing as mp
 
 import matplotlib.pyplot as plt
+import open3d as o3d
 
 def extract_timestamp_from_filename(filename):
     # Extract timestamp from filename
@@ -71,12 +72,12 @@ def main():
 # if __name__ == '__main__':
     # Read LiDAR data
     print("Reading LiDAR data...")
-    csv_file = 'Fusion/data/lidar_20250312_123525.csv'
-    df = pd.read_csv(csv_file, dtype={'X': float, 'Y': float, 'Z': float, 'Intensity': int, 'Tag Information': int}, low_memory=True)
-    df.columns = ['UTC Timestamp', 'Local Timestamp', 'X', 'Y', 'Z', 'Intensity', 'Tag Information']
-    df['Local Timestamp'] = pd.to_datetime(df['Local Timestamp'], format='%Y-%m-%d %H:%M:%S.%f', errors='coerce')
-    df.dropna(subset=['Local Timestamp'], inplace=True)
-    lidar_timestamps = df['Local Timestamp'].to_numpy()
+    lidar_file = 'Fusion/data/lidar_20250312_123525'
+    lidar_timestamps_file = f"{lidar_file}_ts.npy"
+    lidar_data_file = f"{lidar_file}_data.npy"
+    lidar_timestamps = np.load(lidar_timestamps_file)
+    with open(lidar_data_file, 'rb') as f:
+        lidar_data = [np.load(f) for _ in range(len(lidar_timestamps))]
     print("LiDAR data has been read")
 
     # Read speed data
@@ -131,13 +132,22 @@ def main():
 #     exit()
 # print("Done2")
 # exit()    
+
+
 # Read LiDAR data
-csv_file = 'Fusion/data/lidar_20250312_123525.csv'
-df = pd.read_csv(csv_file, dtype={'X': float, 'Y': float, 'Z': float, 'Intensity': int, 'Tag Information': int}, low_memory=True)
-df.columns = ['UTC Timestamp', 'Local Timestamp', 'X', 'Y', 'Z', 'Intensity', 'Tag Information']
-df['Local Timestamp'] = pd.to_datetime(df['Local Timestamp'], format='%Y-%m-%d %H:%M:%S.%f', errors='coerce')
-df.dropna(subset=['Local Timestamp'], inplace=True)
-lidar_timestamps = df['Local Timestamp'].to_numpy()
+# csv_file = 'Fusion/data/lidar_20250312_123525.csv'
+# df = pd.read_csv(csv_file, dtype={'X': float, 'Y': float, 'Z': float, 'Intensity': int, 'Tag Information': int}, low_memory=True)
+# df.columns = ['UTC Timestamp', 'Local Timestamp', 'X', 'Y', 'Z', 'Intensity', 'Tag Information']
+# df['Local Timestamp'] = pd.to_datetime(df['Local Timestamp'], format='%Y-%m-%d %H:%M:%S.%f', errors='coerce')
+# df.dropna(subset=['Local Timestamp'], inplace=True)
+# lidar_timestamps = df['Local Timestamp'].to_numpy()
+lidar_file = 'Fusion/data/lidar_20250312_123525'
+lidar_timestamps_file = f"{lidar_file}_ts.npy"
+lidar_data_file = f"{lidar_file}_data.npy"
+lidar_timestamps = np.load(lidar_timestamps_file, allow_pickle=True)
+lidar_timestamps = np.array([np.datetime64(ts) for ts in lidar_timestamps])
+with open(lidar_data_file, 'rb') as f:
+    lidar_data = [np.load(f, allow_pickle=True) for _ in range(len(lidar_timestamps))]
 
 # Read speed data
 speed_file = 'Fusion/captures30/speed_test.csv'
@@ -154,12 +164,12 @@ png_folder = 'Fusion/captures30/camera_rgba'
 results = {}
 file_list = sorted(os.listdir(png_folder))
 
-output_file = 'Fusion/data/combination_20250312_123525.csv'
+output_file = 'Fusion/data/combination_20250312_123525'
+output_data = f"{output_file}_data.npy"
+output_timestamps = f"{output_file}_ts.npy"
+timestamps = []
 # Match Lidar timestamp with PNG timestamp
-with open(output_file, 'w', newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(['ID', 'Local Timestamp', 'X', 'Y', 'Z', 'Intensity', 'Tag Information', 'Speed'])
-
+with open(output_data, 'wb') as f:
     previous_timestamp = None
     for filename in tqdm(file_list):
         if filename.endswith('.png'):
@@ -169,12 +179,12 @@ with open(output_file, 'w', newline='') as csvfile:
             
             start_idx = np.searchsorted(lidar_timestamps, previous_timestamp, side="right")
             end_idx = np.searchsorted(lidar_timestamps, png_timestamp, side="right")
-            filtered_df = df.iloc[start_idx:end_idx]
-            
-            updated_records = [] 
+            filtered_df = lidar_data[start_idx:end_idx]
+            updated_records = np.empty((0, 5))
             # Start to combine LiDAR data with speed data
-            for idx, row in filtered_df.iterrows():
-                target_timestamp = lidar_timestamps[idx]
+            for idx, points in enumerate(filtered_df):
+                target_timestamp = lidar_timestamps[start_idx+idx]
+                print(target_timestamp)
                 # target_timestamp = row['Local Timestamp']
                 # print(target_timestamp, type(target_timestamp))
                 # print(velocity_timestamps[0], type(velocity_timestamps[0]))
@@ -185,11 +195,13 @@ with open(output_file, 'w', newline='') as csvfile:
                     continue
                 time_diff = (target_timestamp - png_timestamp)
                 time_diff = time_diff.astype(float) / 1e9
-                new_x = float(row['X']) + float(vx * time_diff)
-                # new_x = row['X']
-                updated_records.append([filename, target_timestamp, new_x, row['Y'], row['Z'], row['Intensity'], row['Tag Information'], vx])
-                
-            writer.writerows(updated_records)
+                points[:, 0] = points[:, 0] + vx * time_diff
+                updated_records = np.vstack((updated_records, points))
+            # writer.writerows(updated_records)
+            np.save(f, updated_records)
+            timestamps.append(png_timestamp)
             previous_timestamp = png_timestamp
-
+    print(f"Data has been saved to {output_data}.")
+np.save(output_timestamps, timestamps)
+print(f"Timestamps have been saved to {output_timestamps}.")
 print(f'The results are saved in {output_file}')

@@ -2,9 +2,9 @@ import pyshark
 from scapy.all import rdpcap, UDP, IP, PcapReader
 import struct
 from datetime import datetime, timedelta
-import csv
 import os
 from tqdm import tqdm
+import numpy as np
 
 def create_output_folder(folder_path):
     if not os.path.exists(folder_path):
@@ -58,11 +58,13 @@ def process_lidar_packets(file_path, output_file):
     """
     Process LiDAR packets from a PCAP file and save the data to a CSV file.
     """
-    packets = rdpcap(file_path)
-    with open(output_file, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['UTC Timestamp', 'Local Timestamp', 'X', 'Y', 'Z', 'Intensity', 'Tag Information'])
-
+    output_timestamps = f"{output_file}_ts.npy"
+    output_data = f"{output_file}_data.npy"
+    timestamps = []
+    # packets = rdpcap(file_path)
+    packets = PcapReader(file_path)
+        
+    with open(output_data, 'wb') as f:
         # Iterate over packets and display information
         for packet in tqdm(packets, desc="Processing LiDAR packets"):
             try:
@@ -72,15 +74,18 @@ def process_lidar_packets(file_path, output_file):
                     if timestamp:
                         UTC_Timestamp = Formatted_Realtime(timestamp)
                         Local_Timestamp = UTC_Timestamp + timedelta(hours=1)
+                        timestamps.append(Local_Timestamp)
                         points = parse_lidar_data(data)
-                        writer.writerows([
-                            [UTC_Timestamp, Local_Timestamp, point['x'], point['y'], point['z'], point['intensity'], point['tag_information']]
+                        data =np.array([
+                            [point['x'], point['y'], point['z'], point['intensity'], point['tag_information']]
                             for point in points
                         ])
+                        np.save(f, data)
             except AttributeError as e:
                 continue
+    np.save(output_timestamps, timestamps)
     print(f"Data has been saved to {output_file}.")
 
 if __name__ == "__main__":
     # Process LiDAR packets from a PCAP file
-    process_lidar_packets("Fusion/captures30/lidar_20250312_123525.pcapng", "Fusion/data/lidar_20250312_123525.csv")
+    process_lidar_packets("Fusion/captures30/lidar_20250312_123525.pcapng", "Fusion/data/lidar_20250312_123525_2")
