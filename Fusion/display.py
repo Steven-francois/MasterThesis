@@ -5,7 +5,7 @@ import matplotlib.animation as animation
 import os
 from datetime import datetime
 from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
-# import open3d as o3d
+import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
@@ -13,7 +13,10 @@ nb_file = "30"
 rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 image_folder = f"Fusion/captures{nb_file}/camera_rgba/"
 plot_folder = f"Fusion/plots/fusion{nb_file}"
-# combined_data_file = f"Fusion/data/combi_{nb_file}.csv"
+# lidar_file = f"Fusion/data/combination_{nb_file}"
+lidar_file = f"Fusion/data/combination_20250312_123525"
+lidar_data_file = f"{lidar_file}_data.npy"
+lidar_ts_file = f"{lidar_file}_ts.npy"
 speed_file = f'Fusion/captures{nb_file}/speed_test.csv'
 
 image_filenames = os.listdir(image_folder)
@@ -44,22 +47,25 @@ speed_timestamps = speed_df.index.values
 
 
 
+# Read LiDAR data
+lidar_timestamps = np.float64(np.load(lidar_ts_file, allow_pickle=True) - np.timedelta64(1, 'h'))/1e6
+with open(lidar_data_file, 'rb') as f:
+    lidar_frames = [np.load(f, allow_pickle=True) for _ in range(len(lidar_timestamps))]
 
-# df = pd.read_csv(combined_data_file)
-# Ids = df['ID'].unique()
 
 # Get frame timestamps
 radar_timestamps = radar_timestamps - radar_timestamps[0]
 # radar_timestamps += datetime.strptime(radar_filename.split(".")[0][-15:], "%Y%m%d_%H%M%S").timestamp()
 radar_timestamps += radar_time[0]
-first_start_time = min(images_timestamps[0], radar_timestamps[0], speed_timestamps[0])
+first_start_time = min(images_timestamps[0], radar_timestamps[0], speed_timestamps[0], lidar_timestamps[0])
 image_frame_timestamps = images_timestamps - first_start_time
 radar_frame_timestamps = radar_timestamps - first_start_time
 speed_frame_timestamps = speed_timestamps - first_start_time
-last_start_time = max(image_frame_timestamps[0], radar_frame_timestamps[0], speed_frame_timestamps[0]) + 150
+lidar_frame_timestamps = lidar_timestamps - first_start_time
+last_start_time = max(image_frame_timestamps[0], radar_frame_timestamps[0], speed_frame_timestamps[0], lidar_frame_timestamps[0]) + 150
 
 print(f"First Start Time: {first_start_time}, Last Start Time: {last_start_time}")
-print(f"1st Image Timestamp: {image_frame_timestamps[0]}, 1st Radar Timestamp: {radar_frame_timestamps[0]}, 1st Speed Timestamp: {speed_frame_timestamps[0]}")
+print(f"1st Image Timestamp: {image_frame_timestamps[0]}, 1st Radar Timestamp: {radar_frame_timestamps[0]}, 1st Speed Timestamp: {speed_frame_timestamps[0]}, 1st LiDAR Timestamp: {lidar_frame_timestamps[0]}")
 
 first_camera_frame = np.where(image_frame_timestamps <= last_start_time)[0][-1]
 image_frame_timestamps = image_frame_timestamps[first_camera_frame:]
@@ -75,6 +81,11 @@ first_speed_frame = np.where(speed_frame_timestamps <= last_start_time)[0][-1]
 speed_frame_timestamps = speed_frame_timestamps[first_speed_frame:]
 speed = speed[first_speed_frame:]
 interp_speed = CubicSpline(speed_frame_timestamps, speed, bc_type='natural')
+
+first_lidar_frame = np.where(lidar_frame_timestamps <= last_start_time)[0][-1]
+lidar_frame_timestamps = lidar_frame_timestamps[first_lidar_frame:]
+lidar_frames = lidar_frames[first_lidar_frame:]
+
 
 
 
@@ -116,19 +127,37 @@ timestamp_text = ax.text(xmin, ymin, "", color="white", fontsize=12, bbox=dict(f
 speed_bar = ax3.bar(0.5, 0, width=2)
 ax3.set(xlim=(0, 1), ylim=(0, 50), xticks=np.arange(0, 1, 1), yticks=np.arange(0, 50, 5))
 ax3.set_title("Speed (km/h)")
-# vis = o3d.visualization.Visualizer()
-# vis.create_window()
 
-# geometry = o3d.geometry.PointCloud()
-# filtered_df = df[df['ID'] == Ids[0]]
-# points = filtered_df[['X', 'Y', 'Z']].values
-# intensity = filtered_df['Intensity'].values
-# geometry.points = o3d.utility.Vector3dVector(points)
-# intensity_normalized = (intensity - intensity.min()) / (intensity.max() - intensity.min())
-# colors = plt.cm.viridis(intensity_normalized)[:, :3]  # Use viridis colormap
-# geometry.colors = o3d.utility.Vector3dVector(colors)
-# vis.add_geometry(geometry)
-# # filtered_df_list = [df[df['ID'] == Ids[i]] for i in range(len(Ids))]
+
+global_min_intensity = min([min(lidar_frame[:, 3]) for lidar_frame in lidar_frames if len(lidar_frame) > 0])
+global_max_intensity = max([max(lidar_frame[:, 3]) for lidar_frame in lidar_frames if len(lidar_frame) > 0])
+
+vis = o3d.visualization.Visualizer()
+vis.create_window()
+front = [ -0.92541657839832347, 0.1631759111665346, 0.34202014332566871 ]
+lookat = [ 16.341000000000001, -5.8939999999999992, -0.38849999999999996 ]
+up = [ 0.33682408883346515, -0.059391174613884559, 0.93969262078590854 ]
+
+geometry = o3d.geometry.PointCloud()
+frame_data = lidar_frames[0]
+points = frame_data[:, :3]
+intensity = frame_data[:, 3]
+geometry.points = o3d.utility.Vector3dVector(points)
+intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
+colors = plt.cm.viridis(intensity_normalized)[:, :3]  # Use viridis colormap
+geometry.colors = o3d.utility.Vector3dVector(colors)
+vis.add_geometry(geometry)
+
+def degree_to_pixel(degree):
+    return degree/(0.003 *180/np.pi)
+
+vc = vis.get_view_control()
+# vc.rotate(0, degree_to_pixel(-90))
+# vc.rotate(degree_to_pixel(100), 0)
+# vc.rotate(0, degree_to_pixel(20))
+vc.set_front(front)
+vc.set_lookat(lookat)
+vc.set_up(up)
 
 # def interp_speed(target_timestamp):
 #     new_speed = np.interp(target_timestamp, speed_frame_timestamps, speed)
@@ -137,6 +166,7 @@ ax3.set_title("Speed (km/h)")
 
 rdm_idx = 0
 speed_idx = 0
+lidar_idx = 0
 
 def process_radar_cube_data(range_doppler_matrix, angle=False):
     if angle:
@@ -160,14 +190,14 @@ def process_radar_cube_data(range_doppler_matrix, angle=False):
     return 20 * np.log10(np.abs(range_doppler_matrix) + 1e-6)
 
 def update(frame):
-    global rdm_idx, speed_idx
+    global rdm_idx, speed_idx, lidar_idx, global_min_intensity, global_max_intensity
     if frame == 0:
         rdm_idx = 0
         speed_idx = 0
-    print(f"Frame: {frame}")
-    print(f"RDM Index: {rdm_idx}")
-    print(f"Image Timestamp: {image_frame_timestamps[frame]}")
-    print(f"Radar Timestamp: {radar_frame_timestamps[rdm_idx]}")
+    # print(f"Frame: {frame}")
+    # print(f"RDM Index: {rdm_idx}")
+    # print(f"Image Timestamp: {image_frame_timestamps[frame]}")
+    # print(f"Radar Timestamp: {radar_frame_timestamps[rdm_idx]}")
     # Get image data
     image = np.asarray(plt.imread(image_folder + image_filenames[frame]))
     img2.set_data(image)
@@ -178,6 +208,24 @@ def update(frame):
         # ax3.bar(0.5, speed[frame], width=1)
         if speed_idx < len(speed_frame_timestamps)-1:
             speed_idx += 1
+    # Set LiDAR data
+    if image_frame_timestamps[frame] >= lidar_frame_timestamps[lidar_idx]:
+        # vis.clear_geometries()
+        frame_data = lidar_frames[lidar_idx]
+        points = frame_data[:, :3]
+        intensity = frame_data[:, 3]
+        geometry.points = o3d.utility.Vector3dVector(points)
+        intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
+        colors = plt.cm.viridis(intensity_normalized)[:, :3]
+        geometry.colors = o3d.utility.Vector3dVector(colors)
+        vc.set_front(front)
+        vc.set_lookat(lookat)
+        vc.set_up(up)
+        vis.add_geometry(geometry)
+        vis.poll_events()
+        vis.update_renderer()
+        if lidar_idx < len(lidar_frame_timestamps)-1:
+            lidar_idx += 1
     if image_frame_timestamps[frame] < radar_frame_timestamps[rdm_idx]:
         return img, timestamp_text
     
@@ -227,7 +275,7 @@ def update(frame):
     return img, timestamp_text
 
 def animate():
-    ani = animation.FuncAnimation(fig, update, frames=len(image_filenames), interval=60)
+    ani = animation.FuncAnimation(fig, update, frames=len(image_filenames), interval=10)
     plt.show()
 
 def save():
