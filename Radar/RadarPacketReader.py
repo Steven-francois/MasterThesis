@@ -117,12 +117,9 @@ class RadarPacketReader:
         with open(self.info_file, "wb") as f:
             np.save(f, self.filename)
             np.save(f, self.fields)
-            # np.save(f, self.timestamps)
             np.save(f, self.nb_frames)
             for i in tqdm(range(self.nb_frames), desc="Saving Properties"):
                 np.save(f, self.all_properties[i])
-            # for i in tqdm(range(self.nb_frames), desc="Saving Radar Cube Data"):
-            #     np.save(f, self.radar_cube_datas[i])
                 
     def load(self):
         with open(self.info_file, 'rb') as f:
@@ -154,6 +151,19 @@ class RadarPacketReader:
                 self.radar_cube_datas.append(np.load(f, allow_pickle=True))
             self.radar_cube_datas = np.concatenate(self.radar_cube_datas, axis=0)
             self.radar_cube_datas = self.radar_cube_datas[:self.nb_frames]
+    
+    def update(self):
+        self.create_files()
+        self.save()
+        with open(self.timestamp_file, "wb") as f:
+            for i in range(self.nb_frames//self.max_nb_frames*2):
+                np.save(f, self.timestamps[i*self.max_nb_frames:(i+1)*self.max_nb_frames])
+                np.save(f, self.time[i*self.max_nb_frames:(i+1)*self.max_nb_frames])
+        with open(self.rdc_file, "wb") as f:
+            for i in range(self.nb_frames//self.max_nb_frames):
+                np.save(f, self.radar_cube_datas[i*self.max_nb_frames:(i+1)*self.max_nb_frames])
+            if self.nb_frames % self.max_nb_frames != 0:
+                np.save(f, self.radar_cube_datas[self.nb_frames//self.max_nb_frames*self.max_nb_frames:])
             
     def progress_bar(self, iterable, func, description):
         for i in tqdm(iterable, desc=description):
