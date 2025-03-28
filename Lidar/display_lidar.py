@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -9,7 +8,7 @@ import multiprocessing as mp
 from time import sleep
 
 # Read the data
-lidar_file = 'Fusion/data/combination_20250312_123525'
+lidar_file = 'Fusion/data/combination_20250312_123525_2'
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
 lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)
@@ -73,7 +72,7 @@ if __name__ == '__main__':
         vis.poll_events()
         vis.update_renderer()
         # print(f"Frame {i+1} processed in {time.time() - now:.4f} seconds")
-        sleep(5)
+        # sleep(5)
         
 
     vis.destroy_window()

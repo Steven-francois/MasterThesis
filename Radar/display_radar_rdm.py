@@ -4,7 +4,7 @@ import matplotlib.animation as animation
 import time
 from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 
-nb_file = "30"
+nb_file = "21"
 rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 # rdc_file_bg = f"radar_cube_data_bg{nb_file}.npy" # Replace with your output file path
 
@@ -19,20 +19,6 @@ print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_
 
 
 
-
-
-# with open(rdc_file_bg, 'rb') as f:
-#     fields_bg = np.load(f, allow_pickle=True)
-#     properties_bg = np.load(f, allow_pickle=True)
-#     timestamps_bg = np.load(f, allow_pickle=True)
-#     nb_frames_bg = np.load(f, allow_pickle=True)
-#     radar_cube_data_bg = np.array([np.load(f, allow_pickle=True)])
-#     for _ in range(nb_frames_bg-1):
-#         radar_cube_data_bg = np.append(radar_cube_data_bg, [np.load(f, allow_pickle=True)], axis=0)
-#     print(radar_cube_data_bg.shape)
-
-
-
 # Define radar cube dimensions
 N_RANGE_GATES       = int(fields[6])    # 200
 N_DOPPLER_BINS      = int(fields[8])    # 128
@@ -41,30 +27,12 @@ N_CHIRP_TYPES       = int(fields[10])   # 2
 FIRST_RANGE_GATE    = int(fields[7])    # 0
 print(f"Range Gates: {N_RANGE_GATES}, Doppler Bins: {N_DOPPLER_BINS}, RX Channels: {N_RX_CHANNELS}, Chirp Types: {N_CHIRP_TYPES}")
 
-# # Define Bin Properties
-# DOPPLER_RESOLUTION  = properties[0]
-# RANGE_RESOLUTION    = properties[1]
-# BIN_PER_SPEED       = properties[2]
-# print(f"Doppler Resolution: {DOPPLER_RESOLUTION}, Range Resolution: {RANGE_RESOLUTION}, Bins per m/s: {BIN_PER_SPEED}")
-
 # Define plot limits
 xmin = -200/3.6
 xmax = 200/3.6
 ymin = 0
 ymax = 98
 
-# mean_bg = np.mean(radar_cube_data_bg[:34], axis=0)
-# print(mean_bg.shape)
-# range_doppler_matrix = np.abs(mean_bg[:,:,0,0])
-# print(range_doppler_matrix.shape)
-# plt.figure(figsize=(10, 6))
-# plt.imshow(range_doppler_matrix, aspect='auto', cmap='jet', extent=[-N_DOPPLER_BINS/2*DOPPLER_RESOLUTION, N_DOPPLER_BINS/2*DOPPLER_RESOLUTION, 0, N_RANGE_GATES*RANGE_RESOLUTION])
-# plt.xlabel('Doppler Bins')
-# plt.ylabel('Range Gates')
-# plt.title(f'Range-Doppler Map at BG')
-# plt.colorbar(label='Magnitude (dB)')
-# plt.show()
-# radar_cube_data = radar_cube_data - mean_bg
 
 
 # Setup Matplotlib figure
@@ -73,22 +41,24 @@ img = ax.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, asp
 img2 = ax2.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
 ax.set_xlabel("Doppler Bins")
 ax.set_ylabel("Range Gates")
-ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-ax.set_title("Real-Time Range-Doppler Map")
+# ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+ax.set(xlim=(-8.5, 8.5), ylim=(ymin, ymax))
+ax.set_title("Range-Doppler Map Chirp A")
 ax2.set_xlabel("Doppler Bins")
 ax2.set_ylabel("Range Gates")
-ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-ax2.set_title("Real-Time Range-Doppler Map")
+# ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+ax2.set(xlim=(-8.5, 8.5), ylim=(ymin, ymax))
+ax2.set_title("Range-Doppler Map Chirp B")
 fig.colorbar(img, label="Magnitude (dB)")
 timestamp_text = ax.text(xmin, ymin, "", color="white", fontsize=12, bbox=dict(facecolor='black', alpha=0.5))
 
-def process_radar_cube_data(range_doppler_matrix, angle=False):
+def process_radar_cube_data(range_doppler_matrix, first_seq=False):
     
     # Sum over RX channels and chirps
     # range_doppler_matrix = np.fft.fft(range_doppler_matrix, axis=1)
     # range_doppler_matrix = np.sum(range_doppler_matrix[:,:,:,0], axis=2)
     # print(range_doppler_matrix.shape)
-    if angle:
+    if first_seq:
         range_doppler_matrix = range_doppler_matrix[:, :, 0, 0]
     else:
         range_doppler_matrix = range_doppler_matrix[:, :, 0, 1]
@@ -107,8 +77,8 @@ def update(frame):
     range_doppler_matrix_ = radar_cube_data[frame]
     # if range_doppler_matrix == 0:
     #     return img,
-    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix_)
-    range_doppler_matrix2 = process_radar_cube_data(range_doppler_matrix_, True)
+    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix_, True)
+    range_doppler_matrix2 = process_radar_cube_data(range_doppler_matrix_)
     
     img.set_data(range_doppler_matrix)
     img2.set_data(range_doppler_matrix2)
@@ -127,7 +97,8 @@ def update(frame):
     return img, img2, timestamp_text
 
 def animate():
-    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
+    # ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
+    ani = animation.FuncAnimation(fig, update, frames=range(100,120), interval=1000)
 
     plt.show()
 

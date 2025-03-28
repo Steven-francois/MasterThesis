@@ -160,11 +160,11 @@ velocity_timestamps = speed_df['Time'].to_numpy()
 velocity_speeds = speed_df['Speed (km/h)'].to_numpy()
 
 # Read PNG files
-png_folder = 'Fusion/captures30/camera_rgba'
+png_folder = 'Fusion/data/camera_31'
 results = {}
 file_list = sorted(os.listdir(png_folder))
 
-output_file = 'Fusion/data/combination_20250312_123525'
+output_file = 'Fusion/data/combination_20250312_123525_2'
 output_data = f"{output_file}_data.npy"
 output_timestamps = f"{output_file}_ts.npy"
 timestamps = []
