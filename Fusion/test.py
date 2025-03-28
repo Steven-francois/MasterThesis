@@ -6,8 +6,8 @@ import os
 
 def test_RadarPacketReader():
     # Test the RadarPacketPcapngReader class
-    rdc_file = "Fusion/data/radar_cube_data_20"
-    rdc_reader = RadarPacketReader("Fusion/captures/radar_20250305_160743.pcapng", rdc_file)
+    rdc_file = "Fusion/data/radar_cube_data_31"
+    rdc_reader = RadarPacketReader("Fusion/captures30/radar_20250312_123525.pcapng", rdc_file)
     # rdc_reader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
     rdc_reader.read()
     # rdc_reader.save()

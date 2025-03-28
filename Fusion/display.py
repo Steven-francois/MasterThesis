@@ -9,15 +9,15 @@ import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
-nb_file = "30"
+nb_file = "31"
 rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
-image_folder = f"Fusion/captures{nb_file}/camera_rgba/"
+image_folder = f"Fusion/data/camera_{nb_file}/"
 plot_folder = f"Fusion/plots/fusion{nb_file}"
 # lidar_file = f"Fusion/data/combination_{nb_file}"
-lidar_file = f"Fusion/data/combination_20250312_123525"
+lidar_file = f"Fusion/data/combination_20250312_123525_2"
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
-speed_file = f'Fusion/captures{nb_file}/speed_test.csv'
+speed_file = f'Fusion/captures30/speed_test.csv'
 
 image_filenames = os.listdir(image_folder)
 images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%d_%H-%M-%S-%f").timestamp() for filename in image_filenames])
@@ -29,7 +29,7 @@ rdc_reader.load()
 radar_filename = rdc_reader.filename
 fields = rdc_reader.fields
 rdc_reader.interpolate_timestamps()
-radar_timestamps = rdc_reader.timestamps/1e6
+radar_timestamps = rdc_reader.timestamps#/1e6
 radar_time = rdc_reader.time
 nb_frames = rdc_reader.nb_frames
 all_properties = rdc_reader.all_properties
@@ -54,9 +54,9 @@ with open(lidar_data_file, 'rb') as f:
 
 
 # Get frame timestamps
-radar_timestamps = radar_timestamps - radar_timestamps[0]
+# radar_timestamps = radar_timestamps - radar_timestamps[0]
 # radar_timestamps += datetime.strptime(radar_filename.split(".")[0][-15:], "%Y%m%d_%H%M%S").timestamp()
-radar_timestamps += radar_time[0]
+# radar_timestamps += radar_time[0]
 first_start_time = min(images_timestamps[0], radar_timestamps[0], speed_timestamps[0], lidar_timestamps[0])
 image_frame_timestamps = images_timestamps - first_start_time
 radar_frame_timestamps = radar_timestamps - first_start_time
@@ -240,7 +240,6 @@ def update(frame):
     BIN_PER_SPEED       = properties[2]
     xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
     xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
-    print(f"xt_left: {xt_left}, xt_right: {xt_right}")
     # Correction of speed
     radar_speed = interp_speed(radar_frame_timestamps[rdm_idx])
     xt_left += radar_speed/3.6
