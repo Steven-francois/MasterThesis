@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from scipy.ndimage import label
 
 # Based on the CFAR algorithm described in  Marshall Bruner's video on CFAR
 def cfar(range_doppler, n_guard, n_ref, bias, method):
@@ -57,6 +58,53 @@ def cfar(range_doppler, n_guard, n_ref, bias, method):
     targets_only = mask * range_doppler
     return mask, output, targets_only
 
+def extract_targets(range_doppler, mask, properties):
+    """
+    Extract targets from the range_doppler data using the CFAR mask.
+
+    Parameters
+    ----------
+    range_doppler : numpy.ndarray
+        2D radar data matrix (range x doppler).
+    mask : numpy.ndarray
+        Binary mask of detected targets.
+
+    Returns
+    -------
+    numpy.ndarray
+        Extracted targets.
+    """
+    labeled_mask, n_targets = label(mask)
+    targets = []
+    # Separate targets from the range_doppler data
+    for t in range(1, n_targets + 1):
+        idxs = np.argwhere(labeled_mask == t)
+        if len(idxs) == 0:
+            continue
+        
+        range_idxs, doppler_idxs = idxs[:, 0], idxs[:, 1]
+        target = range_doppler[range_idxs, doppler_idxs]
+        
+        # centroid
+        range_centroid = np.mean(range_idxs)
+        doppler_centroid = np.mean(doppler_idxs)
+        # print(f"Target {t}: Centroid at ({range_centroid}, {doppler_centroid})")
+        peak_idx = np.argmax(target)
+        peak_range = range_idxs[peak_idx]
+        peak_doppler = doppler_idxs[peak_idx]
+        # print(f"Target {t}: Peak at ({peak_range}, {peak_doppler})")
+        # print(f"Target {t}: Peak value {target[peak_idx]}")
+        
+        target_info = {
+            'centroid': (range_centroid, doppler_centroid),
+            'peak': (peak_range, peak_doppler),
+            'value': target[peak_idx],
+            'nb_cells': len(idxs),
+            'properties': properties
+        }
+        targets.append(target_info)
+    return targets
+
 if __name__ == "__main__":
     from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
     nb_file = "21"
@@ -65,6 +113,7 @@ if __name__ == "__main__":
     
     rdc_reader.load()
     radar_cube_data = rdc_reader.radar_cube_datas
+    properties = rdc_reader.all_properties
     
     
     
@@ -100,7 +149,7 @@ if __name__ == "__main__":
     ax_.set_title("Detected Targets")
     plt.show()
     
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
     # Plot the results
     # ax1.imshow(range_doppler, cmap='jet', origin='lower')
     # ax1.set_title("Original Data")
@@ -119,19 +168,45 @@ if __name__ == "__main__":
     # plt.ylabel("Magnitude (dB)")
     # plt.show()
     # exit()
-    
+    targets = []
     def frame(i):
+        N_DOPPLER_BINS = 128
+        N_RANGE_GATES = 200
+        RANGE_RESOLUTION = properties[i][1]
+        DOPPLER_RESOLUTION = properties[i][0]
+        xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION*3.6
+        xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION*3.6
+        yt_bottom = 0
+        yt_top = N_RANGE_GATES*RANGE_RESOLUTION
         print(i)
         ax2.clear()
         range_doppler = np.abs(radar_cube_data[i][:,:,0,0])
-        ax1.imshow(range_doppler, cmap='jet', origin='lower')
+        img1 = ax1.imshow(range_doppler, cmap='jet', origin='lower')
+        img1.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         mask, threshold, targets_only = cfar(range_doppler, n_guard=(1,1), n_ref=(2,3), bias=6, method='CA')
-        ax2.imshow(mask, cmap='gray', origin='lower')
-        r = 33
-        plt.plot(10 * np.log10(np.abs(range_doppler[r])), label="X[k]", c="b")
-        plt.plot(10 * np.log10(np.abs(threshold[r])), label="Threshold", c="y")
-        plt.plot(10 * np.log10(np.abs(targets_only[r])), label="Targets", c="r")
+        img2 = ax2.imshow(mask, cmap='gray', origin='lower')
+        img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        targets.append(extract_targets(range_doppler, mask, properties[i]))
+        labeled_mask, n_targets = label(mask)
+        print(f"Number of targets detected: {n_targets}")
+        img3 = ax3.imshow(labeled_mask, cmap='jet', origin='lower')
+        img3.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        ax3.set_title("Labeled Targets")
+        ax3.set_xlabel("Doppler Bins")
+        ax3.set_ylabel("Range Gates")
+        plt.title("Detected Targets")
+        plt.savefig(f"Fusion/data/cfar_{nb_file}_{i}.png")
+        # r = 33
+        # plt.plot(10 * np.log10(np.abs(range_doppler[r])), label="X[k]", c="b")
+        # plt.plot(10 * np.log10(np.abs(threshold[r])), label="Threshold", c="y")
+        # plt.plot(10 * np.log10(np.abs(targets_only[r])), label="Targets", c="r")
         
-    ani = animation.FuncAnimation(fig, frame, frames=range(100,150), interval=1000)
+    ani = animation.FuncAnimation(fig, frame, frames=range(115,118), interval=1500, repeat=False)
     plt.show()
-    exit()
+    
+    for i, chirp_targets in enumerate(targets):
+        print(f"Chirp nb {i}:")
+        for t, target in enumerate(chirp_targets):
+            if target['centroid'][0] >=91 and target['centroid'][0] <= 107:# and target['centroid'][1] >= 100 and target['centroid'][1] <= 130:
+                print(f"Target {t}: Centroid at {target['centroid']}, Peak at {target['peak']}, Peak value {target['value']}, Number of cells {target['nb_cells']}, Properties {target['properties']}")
+    
