@@ -11,7 +11,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
     
     def read(self):
         print(f"Reading {self.filename}")
-        # self.pcap = rdpcap(self.filename)
+        self.pcap = rdpcap(self.filename, count=2000000)
         self._read_packets()
         self.allocate_memory()
         self.create_files()
@@ -29,13 +29,13 @@ class RadarPacketPcapngReader(RadarPacketReader):
         
 
     def _read_packets(self):
-        with PcapReader(self.filename) as pcap:
+        # with PcapReader(self.filename) as self.pcap:
             def filter_packets(pkt):
                 if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
                     self.rdc_packets.append(pkt)
                 elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
                     self.properties_packets.append(pkt)
-            self.progress_bar(pcap, filter_packets, "Filtering packets")
+            self.progress_bar(self.pcap, filter_packets, "Filtering packets")
             
             def get_sort_key(pkt):
                 payload = pkt[UDP].payload.load
