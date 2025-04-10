@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 from Radar.RadarCanReader import RadarCanReader
+from Radar.cfar import cfar
 
 nb_file = "50"
 rdc_file = f"Radar/data/radar_cube_data_{nb_file}" # Replace with your output file path
@@ -36,27 +37,55 @@ FIRST_RANGE_GATE    = int(fields[7])    # 0
 print(f"Range Gates: {N_RANGE_GATES}, Doppler Bins: {N_DOPPLER_BINS}, RX Channels: {N_RX_CHANNELS}, Chirp Types: {N_CHIRP_TYPES}")
 
 # Define plot limits
-xmin = -200/3.6
-xmax = 200/3.6
+xmin = -30/3.6
+xmax = 30/3.6
+# xmin = -200/3.6
+# xmax = 200/3.6
 ymin = 0
-ymax = 98
+ymax = 96
 
-fig, (ax1, ax2) = plt.subplots(1, 2)
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 img = ax1.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
-scat = ax2.scatter([], [], marker='o', color='b')
-plt.xlim(-200,200)
-plt.ylim(0,96)
-plt.xlabel("Range (m)")
-plt.ylabel("Speed (m/s)")
+ax1.set_title("Range-Doppler Map")
+ax1.set_xlabel("Doppler (m/s)")
+ax1.set_ylabel("Range (m)")
+ax1.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+img2 = ax2.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=1, aspect='auto', cmap='gray', origin='lower')
+ax2.set_title("Range-Doppler Map")
+ax2.set_xlabel("Doppler (m/s)")
+ax2.set_ylabel("Range (m)")
+ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+scat = ax3.scatter([], [], marker='o', color='b')
+ax3.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+ax3.set_title("Detected Targets")
+ax3.set_xlabel("Speed (m/s)")
+ax3.set_ylabel("Range (m)")
 
 
 def update(frame):
     if frame < len(radar_cube_data)-1:
         # Update radar cube data
         radar_cube = radar_cube_data[frame+1]
-        range_doppler_matrix = np.sum(radar_cube[:,:,:,0], axis=2)
-        range_doppler_matrix = 10 * np.log10(np.abs(range_doppler_matrix) + 1e-6)  # Convert to dB scale
-        img.set_array(range_doppler_matrix)
+        # range_doppler_matrix = np.sum(radar_cube[:,:,:,0], axis=2)
+        range_doppler_matrix = radar_cube[:,:,0,0]
+        # range_doppler_matrix = 10 * np.log10(np.abs(range_doppler_matrix) + 1e-6)  # Convert to dB scale
+        range_doppler_matrix = np.abs(range_doppler_matrix)  # Convert to dB scale
+        img.set_data(range_doppler_matrix)
+        
+        properties = all_properties[frame+1]
+        DOPPLER_RESOLUTION  = properties[0]
+        RANGE_RESOLUTION    = properties[1]
+        BIN_PER_SPEED       = properties[2]
+        xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
+        xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
+        yt_bottom = 0
+        yt_top = N_RANGE_GATES*RANGE_RESOLUTION
+        img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        
+        mask, _, _ = cfar(range_doppler_matrix, n_guard=(1,1), n_ref=(2,3), bias=3, method='CA')
+        img2.set_data(mask)
+        # img2 = ax2.imshow(mask, cmap='gray', origin='lower')
+        img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         
     # Update scatter plot with CAN data
     can_target = canReader.can_targets[frame+19]
@@ -74,9 +103,9 @@ def update(frame):
 
     plt.title(f"Frame {frame}")
     
-    return img, scat
+    return img, img2, scat
 
 # ani = animation.FuncAnimation(fig, update, frames=range(len(radar_cube_data)-1), interval=100)
-ani = animation.FuncAnimation(fig, update, frames=range(len(canReader.can_targets)), interval=100)
+ani = animation.FuncAnimation(fig, update, frames=range(390, 500), interval=100)
 plt.show()
 # ani.save('animation.mp4', writer='ffmpeg', fps=30)
