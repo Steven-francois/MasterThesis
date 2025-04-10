@@ -1,10 +1,11 @@
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy.ndimage import label
 
 # Based on the CFAR algorithm described in  Marshall Bruner's video on CFAR
-def cfar(range_doppler, n_guard, n_ref, bias, method):
+def cfar(range_doppler, n_guard, n_ref, bias, method, min_treshold=30):
     """
     Constant False Alarm Rate (CFAR) algorithm for 2D radar data.
 
@@ -20,6 +21,8 @@ def cfar(range_doppler, n_guard, n_ref, bias, method):
         Bias factor.
     method : str
         CFAR method to use (e.g. 'CA', 'GO', 'SO').
+    min_treshold : float, optional
+        Minimum threshold value (default is 30).
 
     Returns
     -------
@@ -51,12 +54,61 @@ def cfar(range_doppler, n_guard, n_ref, bias, method):
             else:
                 raise ValueError("Invalid CFAR method")
             
-            threshold = mean * bias
+            threshold = max(mean * bias, min_treshold)
             output[i, j] = threshold
             if range_doppler[i, j] > threshold:
                 mask[i, j] = 1
     targets_only = mask * range_doppler
     return mask, output, targets_only
+
+def cfar_fast(range_doppler, n_guard, n_ref, bias, method, min_treshold=30):
+    """
+    Fast CFAR algorithm for 2D radar data using sliding window.
+
+    Parameters
+    ----------
+    range_doppler : numpy.ndarray
+        2D radar data matrix (range x doppler).
+    n_guard : int
+        Number of guard cells.
+    n_ref : int
+        Number of reference cells.
+    bias : float
+        Bias factor.
+    method : str
+        CFAR method to use (e.g. 'CA', 'GO', 'SO').
+    min_treshold : float, optional
+        Minimum threshold value (default is 30).
+
+    Returns
+    -------
+    numpy.ndarray
+        Binary mask of detected targets.
+    """
+    # Create a sliding window view of the range_doppler data
+    window_shape = (n_guard[0] + n_ref[0] * 2 + 1, n_guard[1] + n_ref[1] * 2 + 1)
+    pad = ((n_guard[0] + n_ref[0] -1, n_guard[0] + n_ref[0]), (n_guard[1] + n_ref[1]-1, n_guard[1] + n_ref[1]))
+    windows = sliding_window_view(range_doppler, window_shape)
+    
+    # Calculate the mean for each window based on the selected CFAR method
+    if method == 'CA':
+        mean = np.mean(windows, axis=(2, 3))
+    elif method == 'GO':
+        mean = np.max(windows, axis=(2, 3))
+    elif method == 'SO':
+        mean = np.min(windows, axis=(2, 3))
+    
+    # Pad the mean to match the original range_doppler shape
+    mean = np.pad(mean, pad_width=pad, mode='edge')
+    # mean = mean[n_guard[0]:-n_guard[0], n_guard[1]:-n_guard[1]]
+    
+    # Apply bias and minimum threshold
+    threshold = np.maximum(mean * bias, min_treshold)
+    
+    # Create a mask based on the threshold
+    mask = range_doppler > threshold
+    
+    return mask, threshold, mask * range_doppler
 
 def extract_targets(range_doppler, mask, properties):
     """
@@ -107,8 +159,8 @@ def extract_targets(range_doppler, mask, properties):
 
 if __name__ == "__main__":
     from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
-    nb_file = "21"
-    rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
+    nb_file = "50"
+    rdc_file = f"Radar/data/radar_cube_data_{nb_file}" # Replace with your output file path
     rdc_reader = RadarPacketReader("", rdc_file)
     
     rdc_reader.load()
@@ -183,7 +235,7 @@ if __name__ == "__main__":
         range_doppler = np.abs(radar_cube_data[i][:,:,0,0])
         img1 = ax1.imshow(range_doppler, cmap='jet', origin='lower')
         img1.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-        mask, threshold, targets_only = cfar(range_doppler, n_guard=(1,1), n_ref=(2,3), bias=6, method='CA')
+        mask, threshold, targets_only = cfar_fast(range_doppler, n_guard=(1,1), n_ref=(2,3), bias=1, method='GO')
         img2 = ax2.imshow(mask, cmap='gray', origin='lower')
         img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         targets.append(extract_targets(range_doppler, mask, properties[i]))
@@ -201,7 +253,8 @@ if __name__ == "__main__":
         # plt.plot(10 * np.log10(np.abs(threshold[r])), label="Threshold", c="y")
         # plt.plot(10 * np.log10(np.abs(targets_only[r])), label="Targets", c="r")
         
-    ani = animation.FuncAnimation(fig, frame, frames=range(115,118), interval=1500, repeat=False)
+    ani = animation.FuncAnimation(fig, frame, frames=range(390, 500), interval=62, repeat=False)
+    # ani = animation.FuncAnimation(fig, frame, frames=range(115,118), interval=1500, repeat=False)
     plt.show()
     
     for i, chirp_targets in enumerate(targets):
