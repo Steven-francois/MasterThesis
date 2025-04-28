@@ -247,7 +247,7 @@ if __name__ == "__main__":
         ax3.set_xlabel("Doppler Bins")
         ax3.set_ylabel("Range Gates")
         plt.title("Detected Targets")
-        plt.savefig(f"Fusion/data/cfar_{nb_file}_{i}.png")
+        # plt.savefig(f"Fusion/data/cfar_{nb_file}_{i}.png")
         # r = 33
         # plt.plot(10 * np.log10(np.abs(range_doppler[r])), label="X[k]", c="b")
         # plt.plot(10 * np.log10(np.abs(threshold[r])), label="Threshold", c="y")

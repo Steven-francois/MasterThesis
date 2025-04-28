@@ -4,11 +4,10 @@ import matplotlib.animation as animation
 import open3d as o3d
 import time
 from tqdm import tqdm
-import multiprocessing as mp
 from time import sleep
 
 # Read the data
-lidar_file = 'Fusion/data/combination_20250312_123525_2'
+lidar_file = 'Fusion/data/1/lidar_combined'
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
 lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)
@@ -24,9 +23,11 @@ if __name__ == '__main__':
     idx = 0
     for idx_, lidar_frame in enumerate(lidar_frames):
         if len(lidar_frame) >0:
+            print(f"First non-empty frame index: {idx_} with {len(lidar_frame)} points")
             idx = idx_
             break
-            
+    print(f"Starting from frame index: {idx}")
+    print(f"Number of points in the first frame: {len(lidar_frames[idx])}")
     lidar_frames = lidar_frames[idx:]
     lidar_timestamps = lidar_timestamps[idx:]
     global_min_intensity = min([min(lidar_frame[:, 3]) for lidar_frame in lidar_frames if len(lidar_frame) > 0])
@@ -63,6 +64,7 @@ if __name__ == '__main__':
         now = time.time()
         frame_data = lidar_frames[i]
         points = frame_data[:, :3]
+        print(f"Frame {i+1} with {len(frame_data)} points")
         intensity = frame_data[:, 3]
         geometry.points = o3d.utility.Vector3dVector(points)
         intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
