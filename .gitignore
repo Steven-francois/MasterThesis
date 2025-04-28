@@ -3,3 +3,4 @@
 Radar/rdms/*
 */plots/*
 */__pycache__/*
+*/DATA_*/*
