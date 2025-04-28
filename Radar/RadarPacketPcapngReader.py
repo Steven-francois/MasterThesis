@@ -11,25 +11,17 @@ class RadarPacketPcapngReader(RadarPacketReader):
     
     def read(self):
         print(f"Reading {self.filename}")
-        self.pcap = rdpcap(self.filename, count=2000000)
+        # self.pcap = rdpcap(self.filename)
         self._read_packets()
         self.allocate_memory()
         self.create_files()
         self.extract_radar_cube_data()
-        print("Timestamps: ")
-        self.timestamps = np.array(self.timestamps)
-        print((self.timestamps[1:] - self.timestamps[:-1])/1e6)
-        print("Time: ")
-        self.time = np.array(self.time)
-        print(self.time[1:] - self.time[:-1])
-        print("Difference: ")
-        print((self.time[1:] - self.time[:-1]) - (self.timestamps[1:] - self.timestamps[:-1])/1e6)
         self.fill_properties()
         self.save()
         
 
     def _read_packets(self):
-        # with PcapReader(self.filename) as self.pcap:
+        with PcapReader(self.filename) as self.pcap:
             def filter_packets(pkt):
                 if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
                     self.rdc_packets.append(pkt)

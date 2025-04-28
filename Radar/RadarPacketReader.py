@@ -92,7 +92,9 @@ class RadarPacketReader:
     def interpolate_timestamps(self):
         non_zero_indices = np.where(self.timestamps != 0)[0]
         zero_indices = np.where(self.timestamps == 0)[0]
-        self.timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, self.timestamps[non_zero_indices])
+        if len(non_zero_indices) > 0 and len(zero_indices) > 0:
+            self.timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, self.timestamps[non_zero_indices])
+        # self.timestamps[zero_indices] = np.interp(zero_indices, non_zero_indices, self.timestamps[non_zero_indices])
     
     def save_radar_cube_data(self):
         with open(self.rdc_file, "ab") as f:
