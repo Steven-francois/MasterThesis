@@ -1,4 +1,3 @@
-import pyshark
 from scapy.all import rdpcap, UDP, IP, PcapReader
 import struct
 from datetime import datetime, timedelta
