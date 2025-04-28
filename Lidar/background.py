@@ -58,69 +58,71 @@ if __name__ == '__main__':
     first_valid_frame = None
     for idx, lidar_frame in enumerate(lidar_frames):
         if len(lidar_frame) > 0 and interpolate_velocity(velocity_timestamps, velocity_speeds, lidar_timestamps[idx]) is not None and interpolate_velocity(velocity_timestamps, velocity_speeds, lidar_timestamps[idx]) > 10:
-            first_valid_frame = idx
+            print(f"First valid frame: {idx}")
+            first_valid_frame = idx+1235
             break
-    
-    frame_data = lidar_frames[first_valid_frame+1]
-    frame_ts = lidar_timestamps[first_valid_frame+1]
-    previous_frame_data = lidar_frames[first_valid_frame]
-    previous_frame_ts = lidar_timestamps[first_valid_frame]
-    next_frame_data = lidar_frames[first_valid_frame+2]
-    next_frame_ts = lidar_timestamps[first_valid_frame+2]
-    # frame_data = frame_data[frame_data[:, 3] > 0]
-    points = frame_data[:, :3]
-    previous_points = previous_frame_data[:, :3]
-    next_points = next_frame_data[:, :3]
-    prev_delta_ts = (frame_ts - previous_frame_ts).astype(float) / 1e6
-    next_delta_ts = (next_frame_ts - frame_ts).astype(float) / 1e6
-    speed = interpolate_velocity(velocity_timestamps, velocity_speeds, frame_ts)
-    speed /= 3.6
-    print(speed * prev_delta_ts, 0.1)
-    # exit()
-    
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(points)
-    # red color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[1, 0, 0]] * len(points)))
-    vis.add_geometry(geometry)
-    next_points[:, 0] -= speed * next_delta_ts
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(next_points)
-    # blue color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 0, 1]] * len(next_points)))
-    vis.add_geometry(geometry)
-    previous_points[:, 0] += speed * prev_delta_ts
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(previous_points)
-    # green color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 1, 0]] * len(previous_points)))
-    vis.add_geometry(geometry)
-    vis.run()
-    # vis.run()
-    
-    for bg_p in tqdm(previous_points, desc="Removing background"):
-        frame_data = remove_close_points(bg_p, frame_data,2 * speed * prev_delta_ts)
-    for bg_p in tqdm(next_points, desc="Removing background"):
-        frame_data = remove_close_points(bg_p, frame_data, 2 * speed * next_delta_ts)
-    
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(frame_data[:, :3])
-    # red color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[1, 0, 0]] * len(frame_data)))
-    vis.add_geometry(geometry)
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(previous_points)
-    # green color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 1, 0]] * len(previous_points)))
-    vis.add_geometry(geometry)
-    geometry = o3d.geometry.PointCloud()
-    geometry.points = o3d.utility.Vector3dVector(next_points)
-    # blue color
-    geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 0, 1]] * len(next_points)))
-    vis.add_geometry(geometry)
-    vis.run()
+    # first_valid_frame = 1235
+    for _ in range(20):
+        first_valid_frame+=1
+        frame_data = lidar_frames[first_valid_frame+1]
+        frame_ts = lidar_timestamps[first_valid_frame+1]
+        previous_frame_data = lidar_frames[first_valid_frame]
+        previous_frame_ts = lidar_timestamps[first_valid_frame]
+        next_frame_data = lidar_frames[first_valid_frame+2]
+        next_frame_ts = lidar_timestamps[first_valid_frame+2]
+        # frame_data = frame_data[frame_data[:, 3] > 0]
+        points = frame_data[:, :3]
+        previous_points = previous_frame_data[:, :3]
+        next_points = next_frame_data[:, :3]
+        prev_delta_ts = (frame_ts - previous_frame_ts).astype(float) / 1e6
+        next_delta_ts = (next_frame_ts - frame_ts).astype(float) / 1e6
+        speed = interpolate_velocity(velocity_timestamps, velocity_speeds, frame_ts)
+        speed /= 3.6
+        print(speed * prev_delta_ts, 0.1)
+        # exit()
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(points)
+        # red color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[1, 0, 0]] * len(points)))
+        vis.add_geometry(geometry)
+        next_points[:, 0] -= speed * next_delta_ts
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(next_points)
+        # blue color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 0, 1]] * len(next_points)))
+        vis.add_geometry(geometry)
+        previous_points[:, 0] += speed * prev_delta_ts
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(previous_points)
+        # green color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 1, 0]] * len(previous_points)))
+        vis.add_geometry(geometry)
+        vis.run()
+        
+        for bg_p in tqdm(previous_points, desc="Removing background"):
+            frame_data = remove_close_points(bg_p, frame_data,2 * speed * prev_delta_ts)
+        for bg_p in tqdm(next_points, desc="Removing background"):
+            frame_data = remove_close_points(bg_p, frame_data, 2 * speed * next_delta_ts)
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(frame_data[:, :3])
+        # red color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[1, 0, 0]] * len(frame_data)))
+        vis.add_geometry(geometry)
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(previous_points)
+        # green color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 1, 0]] * len(previous_points)))
+        vis.add_geometry(geometry)
+        geometry = o3d.geometry.PointCloud()
+        geometry.points = o3d.utility.Vector3dVector(next_points)
+        # blue color
+        geometry.colors = o3d.utility.Vector3dVector(np.array([[0, 0, 1]] * len(next_points)))
+        vis.add_geometry(geometry)
+        vis.run()
     
