@@ -10,3 +10,5 @@ dependencies:
   - pip
   - pip :
     - open3d
+    - bitstruct
+    - sklearn
