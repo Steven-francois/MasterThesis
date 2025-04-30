@@ -186,6 +186,24 @@ class RadarCanReader():
                 self.can_targets.append(can_target)
         print(f"Loaded {len(self.can_targets)} CAN targets from {filename}")
         print(f"Number of CAN targets: {len(self.can_targets)}")
+        
+    
+    def filter_targets_speed(self, min_speed: float = 0.0, max_speed: float = 200.0):
+        """
+        Filter targets by speed (radial speed).
+        - min_speed: min m/s
+        - max_speed: max m/s
+        """
+        for frame in tqdm(self.can_targets, desc="Filtering CAN targets"):
+            # Skip empty frames
+            data = frame.targets_data
+            if not data:
+                continue
+
+            # Filter targets by speed
+            filtered_data = [t for t in data if min_speed <= abs(t.speed_radial) <= max_speed]
+            frame.targets_data = filtered_data
+            frame.targets_header.nof_targets = len(filtered_data)
 
     def cluster_with_dbscan(self,
                             eps_space: float,
@@ -204,17 +222,24 @@ class RadarCanReader():
                 continue
 
             # Convert spherical (range, az, el) to Cartesian (x,y,z)
-            ranges = np.array([t.t_range       for t in data])
-            azs    = np.deg2rad([t.az_angle    for t in data])
-            els    = np.deg2rad([t.el_angle    for t in data])
+            ranges = np.array([t.t_range       for t in data])# if abs(t.speed_radial) > 1.5])
+            azs    = np.deg2rad([t.az_angle    for t in data])# if abs(t.speed_radial) > 1.5])
+            els    = np.deg2rad([t.el_angle    for t in data])# if abs(t.speed_radial) > 1.5])
             xs     = ranges * np.cos(els) * np.sin(azs)
             ys     = ranges * np.cos(els) * np.cos(azs)
             zs     = ranges * np.sin(els)
-            speeds = np.array([t.speed_radial for t in data])
+            speeds = np.array([t.speed_radial for t in data])# if abs(t.speed_radial) > 1.5])
+            # if len(ranges) == 0:
+            #     frame.targets_data = []
+            #     frame.targets_header.nof_targets = 0
+            #     continue
+            
 
             # Build (N,4) array and normalize each column by its eps
-            features = np.stack([xs, ys, zs, speeds], axis=1)
-            scale    = np.array([eps_space, eps_space, eps_space, eps_speed])
+            # features = np.stack([xs, ys, zs, speeds], axis=1)
+            features = np.stack([ranges, speeds], axis=1)
+            # scale    = np.array([eps_space, eps_space, eps_space, eps_speed])
+            scale    = np.array([eps_space, eps_speed])
             normed   = features / scale  # now each axis has “unit threshold” = 1.0
 
             # DBSCAN with Chebyshev so that max‐diff ≤1 in each dim ---

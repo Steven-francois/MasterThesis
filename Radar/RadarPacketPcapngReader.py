@@ -9,7 +9,10 @@ class RadarPacketPcapngReader(RadarPacketReader):
         self.rdc_packets = []
         self.properties_packets = []
     
-    def read(self):
+    def read(self, filename=None):
+        if filename is None:
+            filename = self.filename
+        self.filename = filename
         print(f"Reading {self.filename}")
         # self.pcap = rdpcap(self.filename)
         self._read_packets()

@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 
 class RadarPacketReader:
-    def __init__(self, filename=None, output_name="rdc_file", max_nb_frames=100):
+    def __init__(self, filename=None, output_name=None, max_nb_frames=100):
         self.filename = filename
         self.rdc_file = f"{output_name}.npy"
         self.info_file = f"{output_name}_info.npy"
@@ -123,7 +123,13 @@ class RadarPacketReader:
             for i in tqdm(range(self.nb_frames), desc="Saving Properties"):
                 np.save(f, self.all_properties[i])
                 
-    def load(self):
+    def load(self, output_name=None):
+        if output_name is not None:
+            self.rdc_file = f"{output_name}.npy"
+            self.info_file = f"{output_name}_info.npy"
+            self.timestamp_file = f"{output_name}_timestamp.npy"
+        if not (self.rdc_file and self.info_file and self.timestamp_file):
+            raise ValueError("Please provide the output name or set the rdc_file, info_file and timestamp_file attributes.")
         with open(self.info_file, 'rb') as f:
             self.filename = str(np.load(f, allow_pickle=True))
             self.fields = np.load(f, allow_pickle=True)
