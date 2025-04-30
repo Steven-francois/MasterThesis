@@ -7,7 +7,7 @@ model = YOLO("yolo11n.pt")
 # results = model.train(data="coco8.yaml", epochs=100, imgsz=640)
 
 # Predict with the model
-results = model.predict(source="Fusion/captures30/camera_rgba/2025-03-12_12-39-52-200401.png", save=True, conf=0.5, show=True)
+results = model.predict(source="Fusion/data/1/camera/2025-04-17_15-40-41-456810.png", save=True, show=True)
 print(results)
 # results = model.predict(source="Fusion/captures30/camera_rgba/2025-03-12_12-37-38-739616.png", save=True, conf=0.5, show=True)
 for result in results:

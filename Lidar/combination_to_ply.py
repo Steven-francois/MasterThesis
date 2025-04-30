@@ -152,10 +152,11 @@ def combine_lidar_speed(lidar_file, png_folder, output_file, speed_file=None):
         use_speed = True
         print("Reading speed data...")
         speed_df = pd.read_csv(speed_file)
-        speed_df['Time'] = pd.to_datetime(speed_df['Time'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+        speed_df['Time'] = pd.to_datetime(speed_df['Time'], format='%Y-%m-%d %H:%M:%S.%f', errors='coerce')
         speed_df.dropna(subset=['Time'], inplace=True)
-        velocity_timestamps = speed_df['Time'].to_numpy()
+        velocity_timestamps = speed_df['Time'].to_numpy() - np.timedelta64(1, 'h')
         velocity_speeds = speed_df['Speed (km/h)'].to_numpy()
+        print(f"Speed start ts: {velocity_timestamps[0]} end ts: {velocity_timestamps[-1]}")
     else:
         velocity_timestamps = None
         velocity_speeds = None

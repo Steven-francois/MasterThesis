@@ -7,7 +7,7 @@ from tqdm import tqdm
 from time import sleep
 
 # Read the data
-lidar_file = 'Fusion/data/1/lidar_combined'
+lidar_file = 'Fusion/data/2/lidar_combined'
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
 lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)

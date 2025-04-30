@@ -9,7 +9,7 @@ import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
-nb_file = "1"
+nb_file = "2"
 data_folder = f"Fusion/data/{nb_file}/"
 image_folder = f"{data_folder}camera/"
 rdc_file = f"{data_folder}radar_cube_data" # Replace with your output file path
@@ -18,7 +18,7 @@ lidar_file = f"{data_folder}lidar_combined"
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
 speed_file = f'{data_folder}speed_test.csv'
-speed_file = None
+# speed_file = None
 # rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 # image_folder = f"Fusion/data/camera_{nb_file}/"
 # plot_folder = f"Fusion/plots/fusion{nb_file}"
@@ -48,11 +48,11 @@ print(f"Fields: {fields}, Number of Frames: {nb_frames}, Number RDC: {len(radar_
 # Read speed data
 if speed_file is not None:
     speed_df = pd.read_csv(speed_file)
-    speed_df['Time'] = speed_df['Time'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp())
-    speed_df = speed_df.groupby('Time').mean()
+    speed_df['Time'] = speed_df['Time'].apply(lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S.%f").timestamp())
+    # speed_df = speed_df.groupby('Time').mean()
     # speed_df = speed_df.reindex(images_timestamps, method='nearest')
     speed = speed_df['Speed (km/h)'].values
-    speed_timestamps = speed_df.index.values
+    speed_timestamps = speed_df['Time'].values
 else:
     speed_timestamps = images_timestamps
     speed = np.zeros(len(images_timestamps))
@@ -74,7 +74,7 @@ image_frame_timestamps = images_timestamps - first_start_time
 radar_frame_timestamps = radar_timestamps - first_start_time
 speed_frame_timestamps = speed_timestamps - first_start_time
 lidar_frame_timestamps = lidar_timestamps - first_start_time
-last_start_time = max(image_frame_timestamps[0], radar_frame_timestamps[0], speed_frame_timestamps[0], lidar_frame_timestamps[0]) + 150
+last_start_time = max(image_frame_timestamps[0], radar_frame_timestamps[0], speed_frame_timestamps[0], lidar_frame_timestamps[0]) # + 150
 
 print(f"First Start Time: {first_start_time}, Last Start Time: {last_start_time}")
 print(f"1st Image Timestamp: {image_frame_timestamps[0]}, 1st Radar Timestamp: {radar_frame_timestamps[0]}, 1st Speed Timestamp: {speed_frame_timestamps[0]}, 1st LiDAR Timestamp: {lidar_frame_timestamps[0]}")
