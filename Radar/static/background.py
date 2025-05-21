@@ -9,24 +9,24 @@ import matplotlib.animation as animation
 from Radar.doppler_resolution import doppler_resolution
 
 
-# Background from 2025-04-29_07-25-00-849710 to 2025-04-29_07-25-15-650407
-# Stop at 2025-04-29_07-25-56-454229
+# Background from 2025-05-14_14-03-25-894467 to 2025-05-14_14-03-27-894547
+# Stop at 2025-05-14_14-03-42-162317
 
 
 rdc_reader = RadarPacketPcapngReader()
-rdc_reader.load("Fusion/data/2/radar_cube_data")
+rdc_reader.load("Fusion/data/test/radar_cube_data")
+print(rdc_reader.timestamps[0], rdc_reader.timestamps[-1])
 can_reader = RadarCanReader()
-can_reader.load_npy("Fusion/data/2/radar_can_data.npy")
+can_reader.load_npy("Fusion/data/test/radar_can_data.npy")
+print(can_reader.can_targets[0].targets_header.real_time, can_reader.can_targets[-1].targets_header.real_time)
 can_reader.filter_targets_speed(1, 200)
 can_reader.cluster_with_dbscan(2,2)
 
-can_ts = np.array([can_reader.can_targets[i].targets_header.real_time for i in range(len(can_reader.can_targets))])
-can_start = np.where(can_ts > rdc_reader.timestamps[0])[0][0]
 
 # Background timestamps
-background_start = datetime.strptime("2025-04-29_07-25-00-849710", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
-background_end = datetime.strptime("2025-04-29_07-25-15-650407", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
-capture_stop = datetime.strptime("2025-04-29_07-25-56-454229", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+background_start = datetime.strptime("2025-05-14_14-03-25-894467", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+background_end = datetime.strptime("2025-05-14_14-03-27-894547", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+capture_stop = datetime.strptime("2025-05-14_14-03-42-162317", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
 print(f"Background start: {background_start}, Background end: {background_end}, Capture stop: {capture_stop}")
 
 # Background data
@@ -63,6 +63,7 @@ ymax = 96
 
 
 fig, (ax1, ax2, ax3)= plt.subplots(1, 3)
+# fig, (ax1, ax2)= plt.subplots(1, 2)
 img = ax1.imshow(np.zeros(image_size), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
 ax1.set_title("Range-Doppler Map w/ bg")
 ax1.set_xlabel("Doppler (m/s)")
@@ -88,7 +89,7 @@ def update(frame):
     range_doppler_matrix = np.max(range_doppler_matrix[:,:,:,0], axis=2)
     range_doppler_matrix = np.abs(range_doppler_matrix)  # Convert to dB scale
     img.set_data(range_doppler_matrix)
-    bg_rdmatrix = range_doppler_matrix - bg_rdc[(frame-bg_idx_start)%3] #- mean_rdc
+    bg_rdmatrix = range_doppler_matrix - bg_rdc[(frame-bg_idx_start)%3] - 2*mean_rdc
     bg_rdmatrix[bg_rdmatrix < 0] = 0
     img2.set_data(bg_rdmatrix)
     # img2.set_data(bg_rdc[0])
@@ -96,7 +97,7 @@ def update(frame):
     # mask, _, _ = cfar(range_doppler_matrix, n_guard=(1,1), n_ref=(2,3), bias=3, method='CA')
     img3.set_data(mask)
     
-    can_target = can_reader.can_targets[frame+can_start]
+    can_target = can_reader.can_targets[frame]
     targets_data = can_target.targets_data
     x = []
     y = []
@@ -141,7 +142,7 @@ if __name__ == "__main__":
     ani = animation.FuncAnimation(fig, update, frames=range(1100, 1300), interval=100)
     plt.show()
     # ani.save("Fusion/data/2/radar_animation.gif", writer='pillow', fps=30)
-    
+    exit()
     frame = 1160
     
     range_doppler_matrix = rdc_reader.radar_cube_datas[frame]
@@ -157,7 +158,7 @@ if __name__ == "__main__":
     
     
     
-    can_target = can_reader.can_targets[frame+can_start]
+    can_target = can_reader.can_targets[frame]
     targets_data = can_target.targets_data
     x = []
     y = []

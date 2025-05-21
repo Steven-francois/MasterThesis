@@ -15,7 +15,7 @@ def coordinate(target_data):
     return np.array([x, y, z])
 
 
-nb_file = "1"
+nb_file = "2"
 can_file = f"Fusion/data/{nb_file}/radar_can_data.npy" # Replace with your output file path
 image_folder = f"Fusion/data/{nb_file}/camera/"
 # nb_file = "41"

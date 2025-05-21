@@ -27,9 +27,13 @@ def doppler_resolution(cfar_targets, targets_data):
         candidate_bands = []
         for i in range(-1, 2):
             distances = np.sqrt((np.array(x) - cfar_range)**2 + (np.array(y) - (cfar_doppler+i*N_DOPPLER_BINS*DOPPLER_RESOLUTION))**2)
+            if len(distances) == 0:
+                continue
             closest_idx = np.argmin(distances)
             candidate_dist.append(distances[closest_idx])
             candidate_bands.append(i)
+        if len(candidate_dist) == 0:
+            continue
         candidate_idx = np.argmin(candidate_dist)
         doppler_band = candidate_bands[candidate_idx]
         if candidate_dist[candidate_idx] < 2:
