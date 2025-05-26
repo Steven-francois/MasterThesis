@@ -9,44 +9,45 @@ import matplotlib.animation as animation
 from Radar.doppler_resolution import doppler_resolution
 
 
+def background(rdc_reader, start_time, end_time, mean=False, stop_time=None):
+    # Background timestamps
+    background_start = datetime.strptime(start_time, "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+    background_end = datetime.strptime(end_time, "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+    if mean:
+        capture_stop = datetime.strptime(stop_time, "%Y-%m-%d_%H-%M-%S-%f").timestamp()
+    print(f"Background start: {background_start}, Background end: {background_end}, Capture stop: {capture_stop}")
+
+    # Background data
+    bg_idx_start = np.where(rdc_reader.timestamps > background_start)[0][0]
+    bg_idx_end = np.where(rdc_reader.timestamps > background_end)[0][0]
+    bg_idx_end = min(bg_idx_end, len(rdc_reader.timestamps) - 1)
+    if mean:
+        stop_idx = np.where(rdc_reader.timestamps > capture_stop)[0][0]
+
+    bg_rdc = np.zeros((3, rdc_reader.radar_cube_datas[0].shape[0], rdc_reader.radar_cube_datas[0].shape[1]))
+    bg_rdc[0] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start:bg_idx_end:3]], axis=0)
+    bg_rdc[1] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start+1:bg_idx_end:3]], axis=0)
+    bg_rdc[2] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start+2:bg_idx_end:3]], axis=0)
+    if mean:
+        mean_rdc = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start:stop_idx]], axis=0)
+
+    bg_rdc[0] = np.abs(bg_rdc[0])  
+    bg_rdc[1] = np.abs(bg_rdc[1])
+    bg_rdc[2] = np.abs(bg_rdc[2])
+    mean_rdc = np.abs(mean_rdc)
+
+    if mean:
+        return bg_idx_start, bg_rdc, mean_rdc
+    return bg_idx_start, bg_rdc
+
+
 # Background from 2025-05-14_14-03-25-894467 to 2025-05-14_14-03-27-894547
 # Stop at 2025-05-14_14-03-42-162317
 
-
 rdc_reader = RadarPacketPcapngReader()
-rdc_reader.load("Fusion/data/test/radar_cube_data")
-print(rdc_reader.timestamps[0], rdc_reader.timestamps[-1])
 can_reader = RadarCanReader()
-can_reader.load_npy("Fusion/data/test/radar_can_data.npy")
-print(can_reader.can_targets[0].targets_header.real_time, can_reader.can_targets[-1].targets_header.real_time)
-can_reader.filter_targets_speed(1, 200)
-can_reader.cluster_with_dbscan(2,2)
+bg_idx_start, bg_rdc, mean_rdc = None, None, None
 
-
-# Background timestamps
-background_start = datetime.strptime("2025-05-14_14-03-25-894467", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
-background_end = datetime.strptime("2025-05-14_14-03-27-894547", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
-capture_stop = datetime.strptime("2025-05-14_14-03-42-162317", "%Y-%m-%d_%H-%M-%S-%f").timestamp()
-print(f"Background start: {background_start}, Background end: {background_end}, Capture stop: {capture_stop}")
-
-# Background data
-bg_idx_start = np.where(rdc_reader.timestamps > background_start)[0][0]
-bg_idx_end = np.where(rdc_reader.timestamps > background_end)[0][0]
-bg_idx_end = min(bg_idx_end, len(rdc_reader.timestamps) - 1)
-stop_idx = np.where(rdc_reader.timestamps > capture_stop)[0][0]
-print(f"Background index start: {bg_idx_start}, Background index end: {bg_idx_end}, Stop index: {stop_idx}")
-
-bg_rdc = np.zeros((3, rdc_reader.radar_cube_datas[0].shape[0], rdc_reader.radar_cube_datas[0].shape[1]))
-bg_rdc[0] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start:bg_idx_end:3]], axis=0)
-bg_rdc[1] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start+1:bg_idx_end:3]], axis=0)
-bg_rdc[2] = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start+2:bg_idx_end:3]], axis=0)
-mean_rdc = np.mean([np.max(range_doppler_matrix[:, :, :, 0], axis=2) for range_doppler_matrix in rdc_reader.radar_cube_datas[bg_idx_start:stop_idx]], axis=0)
-
-
-bg_rdc[0] = np.abs(bg_rdc[0])  # Convert to dB scale
-bg_rdc[1] = np.abs(bg_rdc[1])  # Convert to dB scale
-bg_rdc[2] = np.abs(bg_rdc[2])  # Convert to dB scale
-mean_rdc = np.abs(mean_rdc)  # Convert to dB scale
 
 
 # Define radar cube dimensions
@@ -139,6 +140,15 @@ def update(frame):
     return img, img2
 
 if __name__ == "__main__":
+    rdc_reader.load("Fusion/data/test/radar_cube_data")
+    print(rdc_reader.timestamps[0], rdc_reader.timestamps[-1])
+    can_reader.load_npy("Fusion/data/test/radar_can_data.npy")
+    print(can_reader.can_targets[0].targets_header.real_time, can_reader.can_targets[-1].targets_header.real_time)
+    can_reader.filter_targets_speed(1, 200)
+    can_reader.cluster_with_dbscan(2,2)
+
+    bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-03-25-894467", "2025-05-14_14-03-27-894547", mean=True, stop_time="2025-05-14_14-03-42-162317")
+
     ani = animation.FuncAnimation(fig, update, frames=range(1100, 1300), interval=100)
     plt.show()
     # ani.save("Fusion/data/2/radar_animation.gif", writer='pillow', fps=30)
