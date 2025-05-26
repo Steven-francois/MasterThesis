@@ -152,6 +152,7 @@ def extract_targets(range_doppler, mask, properties):
             'peak': (peak_range, peak_doppler),
             'value': target[peak_idx],
             'nb_cells': len(idxs),
+            'idxs': idxs,
             'properties': properties
         }
         targets.append(target_info)
