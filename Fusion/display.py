@@ -9,16 +9,16 @@ import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
-nb_file = "2"
-data_folder = f"Fusion/data/{nb_file}/"
+nb_file = "1_0"
+data_folder = f"Data/{nb_file}/"
 image_folder = f"{data_folder}camera/"
 rdc_file = f"{data_folder}radar_cube_data" # Replace with your output file path
 plot_folder = f"Fusion/plots/{nb_file}"
 lidar_file = f"{data_folder}lidar_combined"
 lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
-speed_file = f'{data_folder}speed_test.csv'
-# speed_file = None
+# speed_file = f'{data_folder}speed_test.csv'
+speed_file = None
 # rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
 # image_folder = f"Fusion/data/camera_{nb_file}/"
 # plot_folder = f"Fusion/plots/fusion{nb_file}"
@@ -97,8 +97,6 @@ interp_speed = CubicSpline(speed_frame_timestamps, speed, bc_type='natural')
 first_lidar_frame = np.where(lidar_frame_timestamps <= last_start_time)[0][-1]
 lidar_frame_timestamps = lidar_frame_timestamps[first_lidar_frame:]
 lidar_frames = lidar_frames[first_lidar_frame:]
-
-
 
 
 
@@ -202,6 +200,78 @@ def process_radar_cube_data(range_doppler_matrix, angle=False):
     return 20 * np.log10(np.abs(range_doppler_matrix) + 1e-6)
 
 def update(frame):
+    global global_min_intensity, global_max_intensity
+    # print(f"Frame: {frame}")
+    # print(f"RDM Index: {rdm_idx}")
+    # print(f"Image Timestamp: {image_frame_timestamps[frame]}")
+    # print(f"Radar Timestamp: {radar_frame_timestamps[rdm_idx]}")
+    # Get image data
+    image = np.asarray(plt.imread(image_folder + image_filenames[frame]))
+    img2.set_data(image)
+    ax2.axis('off')
+    # Set speed
+    speed_bar[0].set_height(speed[frame])
+    # ax3.bar(0.5, speed[frame], width=1)
+    
+    # Set LiDAR data
+    
+    frame_data = lidar_frames[frame]
+    points = frame_data[:, :3]
+    intensity = frame_data[:, 3]
+    geometry.points = o3d.utility.Vector3dVector(points)
+    intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
+    colors = plt.cm.viridis(intensity_normalized)[:, :3]
+    geometry.colors = o3d.utility.Vector3dVector(colors)
+    vc.set_front(front)
+    vc.set_lookat(lookat)
+    vc.set_up(up)
+    vis.add_geometry(geometry)
+    vis.poll_events()
+    vis.update_renderer()
+    
+    # Get radar cube data
+    range_doppler_matrix = radar_cube_data[frame]
+    # if range_doppler_matrix == 0:
+    #     return img,
+    # Define Bin Properties
+    properties = all_properties[frame]
+    DOPPLER_RESOLUTION  = properties[0]
+    RANGE_RESOLUTION    = properties[1]
+    BIN_PER_SPEED       = properties[2]
+    xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
+    xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
+    # Correction of speed
+    radar_speed = interp_speed(radar_frame_timestamps[frame])
+    xt_left += radar_speed/3.6
+    xt_right += radar_speed/3.6
+    yt_bottom = 0
+    yt_top = N_RANGE_GATES*RANGE_RESOLUTION
+    # fill_neg_bins = np.zeros((N_RANGE_GATES, int((xmin-xt_left)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    # fill_pos_bins = np.zeros((N_RANGE_GATES, int((xt_right-xmax)//DOPPLER_RESOLUTION)), dtype=np.float64)
+    range_doppler_matrix = process_radar_cube_data(range_doppler_matrix)
+    # range_doppler_matrix = np.concatenate((fill_pos_bins, range_doppler_matrix, fill_neg_bins), axis=1)
+    img.set_data(range_doppler_matrix)
+    # img.set_extent([xmax, xmin, yt_bottom, yt_top])
+    img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+    timestamp_text.set_text(f"Timestamp: {frame}")
+        
+    # if image_filenames[frame] in Ids:
+    #     # idx = np.where(Ids == image_filenames[frame])[0][0]
+    #     vis.clear_geometries()
+    #     # filtered_df = filtered_df_list[idx]
+    #     filtered_df = df[df['ID'] == image_filenames[frame]]
+    #     points = filtered_df[['X', 'Y', 'Z']].values
+    #     intensity = filtered_df['Intensity'].values
+    #     geometry.points = o3d.utility.Vector3dVector(points)
+    #     intensity_normalized = (intensity - intensity.min()) / (intensity.max() - intensity.min())
+    #     colors = plt.cm.viridis(intensity_normalized)[:, :3]
+    #     geometry.colors = o3d.utility.Vector3dVector(colors)
+    #     vis.add_geometry(geometry)
+    #     vis.poll_events()
+    #     vis.update_renderer()
+    return img, timestamp_text
+
+def update_old(frame):
     global rdm_idx, speed_idx, lidar_idx, global_min_intensity, global_max_intensity
     if frame == 0:
         rdm_idx = 0
