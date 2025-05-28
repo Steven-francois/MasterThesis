@@ -2,11 +2,12 @@ from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader
 from Radar.RadarCanReader import RadarCanReader
 from Radar.cfar import cfar, extract_targets
 from datetime import datetime
+from scipy.ndimage import gaussian_filter
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
-from Radar.doppler_resolution import doppler_resolution
+from Radar.doppler_resolution import doppler_resolution, range_doppler_resolved
 
 
 def background(rdc_reader, start_time, end_time, mean=False, stop_time=None):
@@ -43,109 +44,128 @@ def background(rdc_reader, start_time, end_time, mean=False, stop_time=None):
 
 # Background from 2025-05-14_14-03-25-894467 to 2025-05-14_14-03-27-894547
 # Stop at 2025-05-14_14-03-42-162317
-
-rdc_reader = RadarPacketPcapngReader()
-can_reader = RadarCanReader()
-bg_idx_start, bg_rdc, mean_rdc = None, None, None
-
-
-
-# Define radar cube dimensions
-N_RANGE_GATES = 200
-N_DOPPLER_BINS = 128
-image_size = (N_RANGE_GATES, N_DOPPLER_BINS)
-# Define plot limits
-xmin = -80/3.6
-xmax = 80/3.6
-# xmin = -200/3.6
-# xmax = 200/3.6
-ymin = 0
-ymax = 96
-
-
-fig, (ax1, ax2, ax3)= plt.subplots(1, 3)
-# fig, (ax1, ax2)= plt.subplots(1, 2)
-img = ax1.imshow(np.zeros(image_size), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
-ax1.set_title("Range-Doppler Map w/ bg")
-ax1.set_xlabel("Doppler (m/s)")
-ax1.set_ylabel("Range (m)")
-ax1.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-img2 = ax2.imshow(np.zeros(image_size), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
-scat2 = ax2.scatter([], [], marker='o', color='r')
-ax2.set_title("Range-Doppler Map w/o bg")
-ax2.set_xlabel("Doppler (m/s)")
-ax2.set_ylabel("Range (m)")
-ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-img3 = ax3.imshow(np.zeros(image_size), vmin=0, vmax=1, aspect='auto', cmap='gray', origin='lower')
-scat = ax3.scatter([], [], marker='o', color='b')
-ax3.set_title("CFAR Map w/o bg")
-ax3.set_xlabel("Doppler (m/s)")
-ax3.set_ylabel("Range (m)")
-ax3.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-
-
-
-def update(frame):
-    range_doppler_matrix = rdc_reader.radar_cube_datas[frame]
-    range_doppler_matrix = np.max(range_doppler_matrix[:,:,:,0], axis=2)
-    range_doppler_matrix = np.abs(range_doppler_matrix)  # Convert to dB scale
-    img.set_data(range_doppler_matrix)
-    bg_rdmatrix = range_doppler_matrix - bg_rdc[(frame-bg_idx_start)%3] - 2*mean_rdc
-    bg_rdmatrix[bg_rdmatrix < 0] = 0
-    img2.set_data(bg_rdmatrix)
-    # img2.set_data(bg_rdc[0])
-    mask, _, _ = cfar(bg_rdmatrix, n_guard=(1,1), n_ref=(2,3), bias=3, method='CA', min_treshold=30)
-    # mask, _, _ = cfar(range_doppler_matrix, n_guard=(1,1), n_ref=(2,3), bias=3, method='CA')
-    img3.set_data(mask)
-    
-    can_target = can_reader.can_targets[frame]
-    targets_data = can_target.targets_data
-    x = []
-    y = []
-    values = []
-    for target in targets_data:
-        x.append(target.t_range)
-        y.append(target.speed_radial)
-        values.append(target.rcs)
-    data = np.stack([y,x]).T
-    scat.set_offsets(data)
-    scat.set_array(np.array(values))
-    
-    
-    properties = rdc_reader.all_properties[frame]
-    DOPPLER_RESOLUTION  = properties[0]
-    RANGE_RESOLUTION    = properties[1]
-    BIN_PER_SPEED       = properties[2]
-    xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
-    xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
-    yt_bottom = 0
-    yt_top = N_RANGE_GATES*RANGE_RESOLUTION
-    img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-    img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-    img3.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-    ax1.set_title(f"Image {frame}")
-    
-    cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
-    r_targets = doppler_resolution(cfar_targets, targets_data)
-    r = []
-    s = []
-    for point in r_targets:
-        r_range, r_doppler = point['centroid']
-        r_range = r_range * RANGE_RESOLUTION + yt_bottom
-        r_doppler = r_doppler * DOPPLER_RESOLUTION + xt_left + N_DOPPLER_BINS*DOPPLER_RESOLUTION*point['doppler_band']
-        r.append(r_range)
-        s.append(r_doppler)
-    data = np.stack([s,r]).T
-    scat2.set_offsets(data)
-    return img, img2
-
 if __name__ == "__main__":
-    rdc_reader.load("Fusion/data/test/radar_cube_data")
+    rdc_reader = RadarPacketPcapngReader()
+    can_reader = RadarCanReader()
+    bg_idx_start, bg_rdc, mean_rdc = None, None, None
+
+
+
+    # Define radar cube dimensions
+    N_RANGE_GATES = 200
+    N_DOPPLER_BINS = 128
+    image_size = (N_RANGE_GATES, N_DOPPLER_BINS)
+    nb_bands = 3  # Number of doppler bands
+    resolved_image_size = (N_RANGE_GATES, N_DOPPLER_BINS + 2 * nb_bands)
+    # Define plot limits
+    xmin = -80/3.6
+    xmax = 80/3.6
+    # xmin = -200/3.6
+    # xmax = 200/3.6
+    ymin = 0
+    ymax = 96
+
+    fig = plt.figure()
+    gs = gridspec.GridSpec(2,3)
+    gs.update(wspace=1, hspace=1)
+    ax1 = plt.subplot(gs[0, 0])
+    ax2 = plt.subplot(gs[0, 1])
+    ax3 = plt.subplot(gs[0, 2])
+    ax4 = plt.subplot(gs[1, :])
+    img = ax1.imshow(np.zeros(image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
+    ax1.set_title("Range-Doppler Map w/ bg")
+    ax1.set_xlabel("Doppler (m/s)")
+    ax1.set_ylabel("Range (m)")
+    ax1.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+    img2 = ax2.imshow(np.zeros(image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
+    scat2 = ax2.scatter([], [], marker='o', color='r')
+    ax2.set_title("Range-Doppler Map w/o bg")
+    ax2.set_xlabel("Doppler (m/s)")
+    ax2.set_ylabel("Range (m)")
+    ax2.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+    img3 = ax3.imshow(np.zeros(image_size), vmin=0, vmax=1, aspect='auto', cmap='gray', origin='lower')
+    scat = ax3.scatter([], [], marker='o', color='b')
+    ax3.set_title("CFAR Map w/o bg")
+    ax3.set_xlabel("Doppler (m/s)")
+    ax3.set_ylabel("Range (m)")
+    ax3.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+    img4 = ax4.imshow(np.zeros(resolved_image_size), vmin=0, vmax=10, aspect='auto', cmap='jet', origin='lower')
+    ax4.set_title("Resolved Range-Doppler Map")
+    ax4.set_xlabel("Doppler (m/s)")
+    ax4.set_ylabel("Range (m)")
+    ax4.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
+
+
+    def update(frame):
+        range_doppler_matrix = rdc_reader.radar_cube_datas[frame]
+        range_doppler_matrix = np.max(range_doppler_matrix[:,:,:,0], axis=2)
+        range_doppler_matrix = np.abs(range_doppler_matrix)  # Convert to dB scale
+        img.set_data(range_doppler_matrix)
+        bg_rdmatrix = range_doppler_matrix - bg_rdc[(frame-bg_idx_start)%3] - 2*mean_rdc
+        bg_rdmatrix[bg_rdmatrix < 0] = 0
+        # bg_rdmatrix = np.clip(bg_rdmatrix, 0, 100)  # Clip values to avoid overflow
+        bg_rdmatrix = gaussian_filter(bg_rdmatrix, sigma=(2,1))  # Apply Gaussian filter for smoothing
+        img2.set_data(bg_rdmatrix)
+        # img2.set_data(bg_rdc[0])
+        mask, _, _ = cfar(bg_rdmatrix, n_guard=(1,1), n_ref=(2,3), bias=1, method='CA', min_treshold=5)
+        # mask, _, _ = cfar(range_doppler_matrix, n_guard=(1,1), n_ref=(2,3), bias=3, method='CA')
+        img3.set_data(mask)
+        
+        can_target = can_reader.can_targets[frame]
+        targets_data = can_target.targets_data
+        x = []
+        y = []
+        values = []
+        for target in targets_data:
+            x.append(target.t_range)
+            y.append(target.speed_radial)
+            values.append(target.rcs)
+        data = np.stack([y,x]).T
+        scat.set_offsets(data)
+        scat.set_array(np.array(values))
+        
+        
+        properties = rdc_reader.all_properties[frame]
+        DOPPLER_RESOLUTION  = properties[0]
+        RANGE_RESOLUTION    = properties[1]
+        BIN_PER_SPEED       = properties[2]
+        xt_left = -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
+        xt_right = (N_DOPPLER_BINS//2 - 1)*DOPPLER_RESOLUTION
+        yt_bottom = 0
+        yt_top = N_RANGE_GATES*RANGE_RESOLUTION
+        img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        img3.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        ax1.set_title(f"Image {frame}")
+        
+        cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
+        r_targets = doppler_resolution(cfar_targets, targets_data)
+        r = []
+        s = []
+        for point in r_targets:
+            r_range, r_doppler = point['centroid']
+            r_range = r_range * RANGE_RESOLUTION + yt_bottom
+            r_doppler = r_doppler * DOPPLER_RESOLUTION + xt_left + N_DOPPLER_BINS*DOPPLER_RESOLUTION*point['doppler_band']
+            r.append(r_range)
+            s.append(r_doppler)
+        data = np.stack([s,r]).T
+        scat2.set_offsets(data)
+        
+        r_rdm = range_doppler_resolved(r_targets, nb_bands)
+        img4.set_data(r_rdm)
+        xt_left = xt_left - nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
+        xt_right = xt_right + nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
+        img4.set_extent([xt_left, xt_right, yt_bottom, yt_top])
+        ax4.set_title(f"Resolved Image {frame}")
+        return img, img2
+
+# if __name__ == "__main__":
+    rdc_reader.load("Data/1_0/radar_cube_data")
     print(rdc_reader.timestamps[0], rdc_reader.timestamps[-1])
-    can_reader.load_npy("Fusion/data/test/radar_can_data.npy")
+    can_reader.load_npy("Data/1_0/radar_can_data.npy")
     print(can_reader.can_targets[0].targets_header.real_time, can_reader.can_targets[-1].targets_header.real_time)
     can_reader.filter_targets_speed(1, 200)
-    can_reader.cluster_with_dbscan(2,2)
+    # can_reader.cluster_with_dbscan(2,2)
 
     bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-03-25-894467", "2025-05-14_14-03-27-894547", mean=True, stop_time="2025-05-14_14-03-42-162317")
 
