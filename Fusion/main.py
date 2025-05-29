@@ -14,6 +14,31 @@ def read_radar_data(eth_file, rdc_file, can_file, can_output_file):
     canReader.read(can_file)
     canReader.save_npy(can_output_file)
     del rdc_reader, canReader
+    
+def filter_radar_images(eth_file, rdc_file, can_output_file, image_folder, new_image_folder):
+    rdc_reader = Rpr(eth_file, rdc_file)
+    canReader = RadarCanReader()
+    rdc_reader.load()
+    canReader.load_npy(can_output_file)
+    
+    filter(rdc_reader, image_folder, new_image_folder)
+    
+    can_ts = np.array([canReader.can_targets[i].targets_header.real_time for i in range(len(canReader.can_targets))])
+    can_start = np.where(can_ts > rdc_reader.timestamps[0])[0][0]
+    can_end = rdc_reader.nb_frames + can_start
+    if can_end > len(canReader.can_targets):
+        can_end = len(canReader.can_targets)
+        rdc_reader.nb_frames = can_end - can_start
+        rdc_reader.timestamps = rdc_reader.timestamps[:rdc_reader.nb_frames]
+        rdc_reader.radar_cube_datas = rdc_reader.radar_cube_datas[:rdc_reader.nb_frames]
+        rdc_reader.all_properties = rdc_reader.all_properties[:rdc_reader.nb_frames]
+        rdc_reader.time = rdc_reader.time[:rdc_reader.nb_frames]
+        rdc_reader.update()
+    canReader.can_targets = canReader.can_targets[can_start:can_end]
+    print(f"Filtered CAN data from {can_start} to {can_end}")
+    
+    # Save filtered CAN data
+    canReader.save_npy(can_output_file)
 
 if __name__ == "__main__":
     name = "1"
@@ -41,25 +66,8 @@ if __name__ == "__main__":
             # speed_file = f"{data_folder}speed_test.csv"
             speed_file = None
             
-            # Read radar data
-            read_radar_data(eth_file, rdc_file, can_file, can_output_file)
-            
-            # Load radar data
-            rdc_reader = Rpr(eth_file, rdc_file)
-            canReader = RadarCanReader()
-            rdc_reader.load()
-            canReader.load_npy(can_output_file)
-            
             # Filter images based on radar timestamps
-            filter(rdc_reader, image_folder, new_image_folder)
-            can_ts = np.array([canReader.can_targets[i].targets_header.real_time for i in range(len(canReader.can_targets))])
-            can_start = np.where(can_ts > rdc_reader.timestamps[0])[0][0]
-            can_end = np.where(can_ts > rdc_reader.timestamps[-1])[0][0]
-            can_end = min(can_end, len(canReader.can_targets) - 1 + can_start)
-            canReader.can_targets = canReader.can_targets[can_start:can_end]
-            print(f"Filtered CAN data from {can_start} to {can_end}")
-            # Save filtered CAN data
-            canReader.save_npy(can_output_file)
+            filter_radar_images(eth_file, rdc_file, can_output_file, image_folder, new_image_folder)
             
             
             # Extract LiDAR data

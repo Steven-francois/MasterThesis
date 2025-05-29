@@ -7,15 +7,7 @@ import time
 from tqdm import tqdm
 import os
 
-# Read the data
-image_folder = 'Fusion/data/31/camera/'
-lidar_file = 'Fusion/data/31/lidar_combined'
-lidar_data_file = f"{lidar_file}_data.npy"
-lidar_ts_file = f"{lidar_file}_ts.npy"
-lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)
-with open(lidar_data_file, 'rb') as f:
-    lidar_frames = [np.load(f, allow_pickle=True) for _ in range(len(lidar_timestamps))]
-image_filenames = os.listdir(image_folder)
+
 
 
 pixel_size = 2.2e-6  # Pixel size in meters
@@ -38,17 +30,17 @@ def remove_background_with_voxels(pcd, background_voxels):
     
     # Convert point cloud points to numpy
     queries = np.asarray(pcd.points)
+    if len(queries) == 0:
+        return pcd
     
     # Run the voxel inclusion test
     inclusion_mask = background_voxels.check_if_included(
         o3d.utility.Vector3dVector(queries)
     )
     inclusion_mask = np.array(inclusion_mask)  # Boolean array
-    print(f"Number of points in background: {np.sum(inclusion_mask)}/{len(inclusion_mask)}")
     
     # Keep only points NOT in background
     foreground_points = queries[~inclusion_mask]
-    print(f"Number of points in foreground: {len(foreground_points)}")
     
     # Create new point cloud
     # foreground_pcd = o3d.geometry.PointCloud()
@@ -100,6 +92,15 @@ def Y_coord_to_pixel(y):
     return y/pixel_size + image_real_height/2/pixel_size
 
 if __name__ == '__main__':
+    # Read the data
+    image_folder = 'Fusion/data/31/camera/'
+    lidar_file = 'Fusion/data/31/lidar_combined'
+    lidar_data_file = f"{lidar_file}_data.npy"
+    lidar_ts_file = f"{lidar_file}_ts.npy"
+    lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)
+    with open(lidar_data_file, 'rb') as f:
+        lidar_frames = [np.load(f, allow_pickle=True) for _ in range(len(lidar_timestamps))]
+    image_filenames = os.listdir(image_folder)
     print("Displaying LiDAR data...")
     print(f"Number of LiDAR frames: {len(lidar_frames)}")
 
