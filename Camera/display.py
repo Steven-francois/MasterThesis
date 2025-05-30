@@ -32,5 +32,5 @@ def display_images_as_animation(folder_path, delay=1):
     plt.show()
 
 # Replace 'your_folder_path' with the path to your folder containing images
-folder_path = 'runs/detect/predict4'
+folder_path = 'Data/1_0/cam_targets/targets'
 display_images_as_animation(folder_path, delay=0.06)
