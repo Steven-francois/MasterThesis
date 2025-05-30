@@ -1,8 +1,9 @@
-*/captures*/*
-*/data/*
-*/Data/*
+**/captures*/*
+**/data/*
+Data/*
 Radar/rdms/*
-*/plots/*
-*/__pycache__/*
-*/DATA_*/*
+**/plots/*
+**/__pycache__/*
+**/DATA_*/*
 */2025*/*
+runs/*
