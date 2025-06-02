@@ -3,7 +3,7 @@ import numpy as np
 N_DOPPLER_BINS = 128
 N_RANGE_GATES = 200
 
-def doppler_resolution(cfar_targets, targets_data):
+def doppler_resolution(cfar_targets, targets_data, nb_bands=3):
     resolved_points = []
     if len(cfar_targets) == 0:
         return resolved_points
@@ -24,7 +24,7 @@ def doppler_resolution(cfar_targets, targets_data):
         cfar_doppler = cfar_doppler * DOPPLER_RESOLUTION -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
         candidate_dist = []
         candidate_bands = []
-        for i in range(-1, 2):
+        for i in range(-nb_bands, nb_bands + 1):
             distances = np.sqrt((np.array(x) - cfar_range)**2 + (np.array(y) - (cfar_doppler+i*N_DOPPLER_BINS*DOPPLER_RESOLUTION))**2)
             if len(distances) == 0:
                 continue

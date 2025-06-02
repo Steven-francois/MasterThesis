@@ -9,14 +9,14 @@ from scipy.ndimage import gaussian_filter
 from Radar.doppler_resolution import doppler_resolution, range_doppler_resolved
 from tqdm import trange
 
-nb = "1_0"
+nb = "1_1"
 data_folder = f"Data/{nb}/"
 rdc_reader = RadarPacketPcapngReader()
 rdc_reader.load(f"{data_folder}radar_cube_data")
 can_reader = RadarCanReader()
 can_reader.load_npy(f"{data_folder}radar_can_data.npy")
 can_reader.filter_targets_speed(1, 200)
-bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-03-25-894467", "2025-05-14_14-03-27-894547", mean=True, stop_time="2025-05-14_14-03-42-162317")
+bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-08-15-875622", "2025-05-14_14-08-57-842836", mean=True, stop_time="2025-05-14_14-09-11-042610")
 radar_folder = os.path.join(data_folder, "radar")
 resolved_rdm_folder = os.path.join(data_folder, "radar", "rdm")
 targets_folder = os.path.join(data_folder, "radar", "targets")
@@ -27,7 +27,7 @@ os.makedirs(targets_folder, exist_ok=True)
 nb_bands = 3  # Number of doppler bands to consider
 
 with open(os.path.join(radar_folder, f"rdm.npy"), 'wb') as f_rdm:
-    for i in trange(rdc_reader.nb_frames):
+    for i in trange(len(can_reader.can_targets)):
         range_doppler_matrix = rdc_reader.radar_cube_datas[i]
         range_doppler_matrix = np.max(range_doppler_matrix[:,:,:,0], axis=2)
         range_doppler_matrix = np.abs(range_doppler_matrix)
@@ -45,7 +45,7 @@ with open(os.path.join(radar_folder, f"rdm.npy"), 'wb') as f_rdm:
         BIN_PER_SPEED       = properties[2]
         
         cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
-        r_targets = doppler_resolution(cfar_targets, targets_data)
+        r_targets = doppler_resolution(cfar_targets, targets_data, nb_bands)
         r_rdm = range_doppler_resolved(r_targets, nb_bands)
         
         # with open(os.path.join(resolved_rdm_folder, f"rdm_{i}.npy"), 'wb') as f:
