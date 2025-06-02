@@ -86,9 +86,9 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     
     return targets_nb
 
-nb = "1_0"
-# data_folder = f"Data/{nb}/"
-data_folder = f"D:/processed"
+nb = "1_1"
+data_folder = f"Data/{nb}/"
+# data_folder = f"D:/processed"
 image_folder = os.path.join(data_folder, "cam_targets")
 lidar_folder = os.path.join(data_folder, "lidar")
 radar_folder = os.path.join(data_folder, "radar", "targets")
@@ -108,10 +108,10 @@ SAVE = False
 
 if SAVE:
     f = open(os.path.join(fusion_folder, "targets.npy"), "wb")
-    np.save(f, len(cam_frames)-1, allow_pickle=True)
+    np.save(f, len(cam_frames), allow_pickle=True)
 nb_frame = 201
-# for nb_frame in trange(len(cam_frames)-1):
-for nb_frame in range(445, 455):
+# for nb_frame in trange(len(cam_frames)):
+for nb_frame in range(4360, 4370):
     cam_frame = cam_frames[nb_frame]
     with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
         radar_targets = json.load(rt_file)
@@ -125,7 +125,8 @@ for nb_frame in range(445, 455):
     radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
     if SAVE:
         np.save(f,match_modalities(cam_coords, lidar_coords, radar_coords), allow_pickle=True)
-    match_modalities(cam_coords, lidar_coords, radar_coords, verbose=True)
+    else:
+        match_modalities(cam_coords, lidar_coords, radar_coords, verbose=not SAVE)
 if SAVE:
     f.close()
     print(f"Fusion targets saved to {os.path.join(fusion_folder, 'targets.npy')}")
