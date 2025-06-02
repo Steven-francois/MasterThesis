@@ -7,9 +7,9 @@ import matplotlib.animation as animation
 import open3d as o3d
 
 
-nb = "1_0"
-# data_folder = f"Data/{nb}/"
-data_folder = f"D:/processed"
+nb = "1_1"
+data_folder = f"Data/{nb}/"
+# data_folder = f"D:/processed"
 camera_folder = os.path.join(data_folder, "camera")
 camera_target_folder = os.path.join(data_folder, "cam_targets")
 lidar_folder = os.path.join(data_folder, "lidar")
@@ -128,7 +128,8 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         vis.poll_events()
         vis.update_renderer()
     
-    ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
+    # ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
+    ani = animation.FuncAnimation(fig, update, frames=range(4360,4380), interval=delay * 1000)
     plt.show()
     
 if __name__ == "__main__":
