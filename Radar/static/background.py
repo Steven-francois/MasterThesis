@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 from Radar.doppler_resolution import doppler_resolution, range_doppler_resolved
+from Radar.doppler_reconstruction import doppler_reconstruct
 
 
 def background(rdc_reader, start_time, end_time, mean=False, stop_time=None):
@@ -89,7 +90,7 @@ if __name__ == "__main__":
     ax3.set_xlabel("Doppler (m/s)")
     ax3.set_ylabel("Range (m)")
     ax3.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
-    img4 = ax4.imshow(np.zeros(resolved_image_size), vmin=0, vmax=10, aspect='auto', cmap='jet', origin='lower')
+    img4 = ax4.imshow(np.zeros(resolved_image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
     ax4.set_title("Resolved Range-Doppler Map")
     ax4.set_xlabel("Doppler (m/s)")
     ax4.set_ylabel("Range (m)")
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         ax1.set_title(f"Image {frame}")
         
         cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
-        r_targets = doppler_resolution(cfar_targets, targets_data)
+        r_targets = doppler_resolution(cfar_targets, targets_data, nb_bands)
         r = []
         s = []
         for point in r_targets:
@@ -151,7 +152,9 @@ if __name__ == "__main__":
         data = np.stack([s,r]).T
         scat2.set_offsets(data)
         
-        r_rdm = range_doppler_resolved(r_targets, nb_bands)
+        r_rdm = doppler_reconstruct(range_doppler_matrix, targets_data, nb_bands, properties)
+        r_rdm = np.abs(r_rdm)
+        # r_rdm = range_doppler_resolved(r_targets, nb_bands)
         img4.set_data(r_rdm)
         xt_left = xt_left - nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
         xt_right = xt_right + nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
