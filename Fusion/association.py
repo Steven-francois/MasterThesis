@@ -60,6 +60,8 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     
     if verbose:
         print(f"Frame {nb_frame}: {len(matches_CL)} camera-LiDAR matches, {len(matches_RL)} radar-LiDAR matches: {len(cam_frame)} camera targets, {len(lidar_targets)} LiDAR targets, {len(radar_targets)} radar targets")
+        print((f"Camera-LiDAR cost matrix:\n{cost_matrix_CL}\n"))
+        print((f"Radar-LiDAR cost matrix:\n{cost_matrix_RL}\n"))
     
     # print(f"CL Frame {nb_frame}: {len(matches_CL)} matches found")
     # for i, j in matches_CL:
@@ -85,8 +87,8 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     return targets_nb
 
 nb = "1_0"
-data_folder = f"Data/{nb}/"
-# data_folder = f"D:/processed"
+# data_folder = f"Data/{nb}/"
+data_folder = f"D:/processed"
 image_folder = os.path.join(data_folder, "cam_targets")
 lidar_folder = os.path.join(data_folder, "lidar")
 radar_folder = os.path.join(data_folder, "radar", "targets")
@@ -101,23 +103,32 @@ with open(os.path.join(lidar_folder, "targets.npy"), "rb") as f:
 
 cam_fov = np.array((30,17))
 cam_size = np.array((640, 480))
-with open(os.path.join(fusion_folder, "targets.npy"), "wb") as f:
+
+SAVE = False
+
+if SAVE:
+    f = open(os.path.join(fusion_folder, "targets.npy"), "wb")
     np.save(f, len(cam_frames)-1, allow_pickle=True)
-    nb_frame = 201
-    for nb_frame in trange(len(cam_frames)-1):
-    # for nb_frame in range(200, 201):
-        cam_frame = cam_frames[nb_frame]
-        with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
-            radar_targets = json.load(rt_file)
-        lidar_frame = lidar_frames[nb_frame]
-        nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
-        lidar_targets = np.zeros((nb_lidar_targets, 3))
-        for i in range(nb_lidar_targets):
-            lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
-        cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
-        lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
-        radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
+nb_frame = 201
+# for nb_frame in trange(len(cam_frames)-1):
+for nb_frame in range(445, 455):
+    cam_frame = cam_frames[nb_frame]
+    with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
+        radar_targets = json.load(rt_file)
+    lidar_frame = lidar_frames[nb_frame]
+    nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
+    lidar_targets = np.zeros((nb_lidar_targets, 3))
+    for i in range(nb_lidar_targets):
+        lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
+    cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
+    lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
+    radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
+    if SAVE:
         np.save(f,match_modalities(cam_coords, lidar_coords, radar_coords), allow_pickle=True)
+    match_modalities(cam_coords, lidar_coords, radar_coords, verbose=True)
+if SAVE:
+    f.close()
+    print(f"Fusion targets saved to {os.path.join(fusion_folder, 'targets.npy')}")
         
     
     
