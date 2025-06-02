@@ -55,11 +55,13 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     """
     Match camera, LiDAR, and radar coordinates.
     """
-    matches_CL, cost_matrix_CL = match_dual_modalities(cam_coords, lidar_coords[:, :2]) if len(cam_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
+    matches_CL, cost_matrix_CL = match_dual_modalities(cam_coords, lidar_coords[:, :2], 4) if len(cam_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
     matches_RL, cost_matrix_RL = match_dual_modalities(radar_coords[:, 0], lidar_coords[:, 2]) if len(radar_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
-    
+    matches_CL = np.array([match for match in matches_CL if lidar_coords[match[1], 2] < 20 or cost_matrix_CL[match[0], match[1]] < 2])
+
     if verbose:
         print(f"Frame {nb_frame}: {len(matches_CL)} camera-LiDAR matches, {len(matches_RL)} radar-LiDAR matches: {len(cam_frame)} camera targets, {len(lidar_targets)} LiDAR targets, {len(radar_targets)} radar targets")
+        print((f"Lidar targets distance: \n{lidar_coords[:, 2]}\n"))
         print((f"Camera-LiDAR cost matrix:\n{cost_matrix_CL}\n"))
         print((f"Radar-LiDAR cost matrix:\n{cost_matrix_RL}\n"))
     
@@ -111,7 +113,7 @@ if SAVE:
     np.save(f, len(cam_frames), allow_pickle=True)
 nb_frame = 201
 # for nb_frame in trange(len(cam_frames)):
-for nb_frame in range(4360, 4370):
+for nb_frame in range(4369, 4371):
     cam_frame = cam_frames[nb_frame]
     with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
         radar_targets = json.load(rt_file)
