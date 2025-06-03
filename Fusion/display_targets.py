@@ -24,15 +24,24 @@ with open(os.path.join(lidar_folder, "targets.npy"), "rb") as f:
     lidar_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
 with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
     num_frames = np.load(f, allow_pickle=True)
-    fusion_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
+    fusion_frames = []
+    CL_frames = []
+    RL_frames = []
+    for _ in range(num_frames):
+        fusion_frames.append(np.load(f, allow_pickle=True))
+        CL_frames.append(np.load(f, allow_pickle=True))
+        RL_frames.append(np.load(f, allow_pickle=True))
 
 
 def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_folder, fusion_frames, delay=0.1):
+    # Create a figure with subplots for camera and radar frames
     fig = plt.figure(figsize=(15, 10))
     gs = gridspec.GridSpec(2, 2, width_ratios=[1, 1], height_ratios=[1, 1])
     
     ax_cam = fig.add_subplot(gs[0, :])
     ax_radar = fig.add_subplot(gs[1, :])
+    
+    # Create a 3D visualizer for LiDAR data
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     geometry = o3d.geometry.PointCloud()
@@ -71,7 +80,15 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         nb_targets = fusion_frame.shape[0]
         cam_idx, lidar_idx, radar_idx = fusion_frame.T.astype(int)
         print(cam_idx, lidar_idx, radar_idx)
-        colors = plt.get_cmap("tab20")(np.arange(nb_targets) / nb_targets) if nb_targets > 0 else np.array([[0, 0, 0, 0]])
+        colors = plt.get_cmap("tab10")(np.arange(nb_targets) / nb_targets) if nb_targets > 0 else np.array([[0, 0, 0, 0]])
+        CL_frame = CL_frames[frame]
+        RL_frame = RL_frames[frame]
+        nb_CL_targets = CL_frame.shape[0] if len(CL_frame) > 0 else 0
+        nb_RL_targets = RL_frame.shape[0] if len(RL_frame) > 0 else 0
+        nb_single_targets = nb_CL_targets + nb_RL_targets
+        cam_CL_idx, lidar_CL_idx = CL_frame.T.astype(int) if len(CL_frame) > 0 else ([], [])
+        radar_RL_idx, lidar_RL_idx = RL_frame.T.astype(int) if len(RL_frame) > 0 else ([], [])
+        single_color = plt.get_cmap("Pastel1")(np.arange(nb_single_targets) / nb_single_targets) if nb_single_targets > 0 else np.array([[0, 0, 0, 0]])
         unassociated_color = np.array([0.5, 0.5, 0.5, 1])  # Gray for unassociated targets
 
         # Display camera frame
@@ -83,6 +100,8 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 x, y = target[0]-target[2]/2, target[1]-target[3]/2  # Center the rectangle
                 if i in cam_idx:
                     edgecolor = colors[np.where(cam_idx == i)[0][0]]
+                elif i in cam_CL_idx:
+                    edgecolor = single_color[np.where(cam_CL_idx == i)[0][0]]
                 else:
                     edgecolor = unassociated_color
                 ax_cam.add_patch(plt.Rectangle((x,y), target[2], target[3], fill=False, edgecolor=edgecolor, linewidth=2))
@@ -104,6 +123,8 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 x, y = coord[1], coord[0]
                 if i in radar_idx:
                     color = colors[np.where(radar_idx == i)[0][0]]
+                elif i in radar_RL_idx:
+                    color = single_color[np.where(radar_RL_idx == i)[0][0]+nb_CL_targets]
                 else:
                     color = unassociated_color
                 ax_radar.scatter(x, y, c=color, label='Radar Target')
@@ -121,15 +142,15 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         #     lidar_targets[i] = lidar_frame[lidar_frame[:, 3] == i, :3]
         # points = np.concatenate([lidar_targets[i] for i in lidar_idx if i < nb_lidar_targets], axis=0) if len(lidar_idx) > 0 else np.zeros((0, 3))
         points = lidar_frame[:, :3] if len(lidar_frame) > 0 else np.zeros((0, 3))
-        lidar_colors = np.array([colors[np.where(lidar_idx == lidar_frame[i,3])[0][0]][:3] if lidar_frame[i,3] in lidar_idx else unassociated_color[:3] for i in range(len(lidar_frame))]) if len(lidar_frame) > 0 else np.zeros((0, 3))
+        lidar_colors = np.array([colors[np.where(lidar_idx == lidar_frame[i,3])[0][0]][:3] if lidar_frame[i,3] in lidar_idx else (single_color[np.where(lidar_CL_idx == lidar_frame[i,3])[0][0]][:3] if lidar_frame[i,3] in lidar_CL_idx else (single_color[np.where(lidar_RL_idx == lidar_frame[i,3])[0][0]+nb_CL_targets][:3] if lidar_frame[i,3] in lidar_RL_idx else unassociated_color[:3])) for i in range(len(lidar_frame))]) if len(lidar_frame) > 0 else np.zeros((0, 3))
         geometry.points = o3d.utility.Vector3dVector(points)
         geometry.colors = o3d.utility.Vector3dVector(lidar_colors)
         vis.update_geometry(geometry)
         vis.poll_events()
         vis.update_renderer()
     
-    # ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
-    ani = animation.FuncAnimation(fig, update, frames=range(4360,4380), interval=delay * 1000)
+    ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
+    # ani = animation.FuncAnimation(fig, update, frames=range(4420, 4440), interval=delay * 1000)
     plt.show()
     
 if __name__ == "__main__":
