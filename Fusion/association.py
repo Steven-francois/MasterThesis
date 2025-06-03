@@ -54,14 +54,27 @@ def match_dual_modalities(mod1, mod2, threshold=2):
 def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     """
     Match camera, LiDAR, and radar coordinates.
+    
+    returns:
+        (targets_nb, matches_CL, matches_RL):
+        targets_nb: np.ndarray
+            [[cam_nb, lidar_nb, radar_nb], ...]
+            An array of shape (n, 3) where n is the number of matched targets.
+            Each row contains the indices of the matched camera, LiDAR, and radar targets.
+        matches_CL: np.ndarray
+            [[cam_nb, lidar_nb], ...]
+            An array of shape (m, 2) where m is the number of camera-LiDAR matches not present in targets_nb.
+        matches_RL: np.ndarray
+            [[radar_nb, lidar_nb], ...]
+            An array of shape (p, 2) where p is the number of radar-LiDAR matches not present in targets_nb.
     """
-    matches_CL, cost_matrix_CL = match_dual_modalities(cam_coords, lidar_coords[:, :2], 4) if len(cam_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
-    matches_RL, cost_matrix_RL = match_dual_modalities(radar_coords[:, 0], lidar_coords[:, 2]) if len(radar_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
-    matches_CL = np.array([match for match in matches_CL if lidar_coords[match[1], 2] < 20 or cost_matrix_CL[match[0], match[1]] < 2])
+    matches_CL, cost_matrix_CL = match_dual_modalities(cam_coords, lidar_coords[:, :2], 10) if len(cam_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
+    matches_RL, cost_matrix_RL = match_dual_modalities(radar_coords[:, 0], lidar_coords[:, 2], 10) if len(radar_coords) > 0 and len(lidar_coords) > 0 else ([], np.zeros((0, 0)))
+    # matches_CL = np.array([match for match in matches_CL if lidar_coords[match[1], 2] < 20 or cost_matrix_CL[match[0], match[1]] < 2])
 
     if verbose:
         print(f"Frame {nb_frame}: {len(matches_CL)} camera-LiDAR matches, {len(matches_RL)} radar-LiDAR matches: {len(cam_frame)} camera targets, {len(lidar_targets)} LiDAR targets, {len(radar_targets)} radar targets")
-        print((f"Lidar targets distance: \n{lidar_coords[:, 2]}\n"))
+        print((f"Lidar targets distance: \n{lidar_coords[:, 2] if len(lidar_coords)>0 else None}\n"))
         print((f"Camera-LiDAR cost matrix:\n{cost_matrix_CL}\n"))
         print((f"Radar-LiDAR cost matrix:\n{cost_matrix_RL}\n"))
     
@@ -82,56 +95,86 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
     radar_nb = matches_RL[idx_RL, 0] if len(matches_RL) > 0 else np.array([])
     
     targets_nb = np.column_stack((cam_nb, lidar_nb, radar_nb))
+    matches_CL = np.array([match for match in matches_CL if match[0] not in cam_nb])
+    matches_RL = np.array([match for match in matches_RL if match[0] not in radar_nb])
     if verbose:
         print(f"--- Frame {nb_frame}: {len(targets_nb)} targets found with camera, LiDAR, and radar")
     
     
-    return targets_nb
+    return targets_nb, matches_CL, matches_RL
 
-nb = "1_1"
-data_folder = f"Data/{nb}/"
-# data_folder = f"D:/processed"
-image_folder = os.path.join(data_folder, "cam_targets")
-lidar_folder = os.path.join(data_folder, "lidar")
-radar_folder = os.path.join(data_folder, "radar", "targets")
-fusion_folder = os.path.join(data_folder, "fusion")
-os.makedirs(fusion_folder, exist_ok=True)
-with open(os.path.join(image_folder, "targets.npy"), "rb") as f:
-    num_frames = np.load(f, allow_pickle=True)
-    cam_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
-with open(os.path.join(lidar_folder, "targets.npy"), "rb") as f:
-    num_frames = np.load(f, allow_pickle=True)
-    lidar_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    nb = "1_1"
+    data_folder = f"Data/{nb}/"
+    # data_folder = f"D:/processed"
+    image_folder = os.path.join(data_folder, "cam_targets")
+    lidar_folder = os.path.join(data_folder, "lidar")
+    radar_folder = os.path.join(data_folder, "radar", "targets")
+    fusion_folder = os.path.join(data_folder, "fusion")
+    os.makedirs(fusion_folder, exist_ok=True)
+    with open(os.path.join(image_folder, "targets.npy"), "rb") as f:
+        num_frames = np.load(f, allow_pickle=True)
+        cam_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
+    with open(os.path.join(lidar_folder, "targets.npy"), "rb") as f:
+        num_frames = np.load(f, allow_pickle=True)
+        lidar_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
 
-cam_fov = np.array((30,17))
-cam_size = np.array((640, 480))
+    cam_fov = np.array((30,17))
+    cam_size = np.array((640, 480))
 
-SAVE = False
+    SAVE = True
+    dist = []
+    error_CL = []
+    error_RL = []
 
-if SAVE:
-    f = open(os.path.join(fusion_folder, "targets.npy"), "wb")
-    np.save(f, len(cam_frames), allow_pickle=True)
-nb_frame = 201
-# for nb_frame in trange(len(cam_frames)):
-for nb_frame in range(4369, 4371):
-    cam_frame = cam_frames[nb_frame]
-    with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
-        radar_targets = json.load(rt_file)
-    lidar_frame = lidar_frames[nb_frame]
-    nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
-    lidar_targets = np.zeros((nb_lidar_targets, 3))
-    for i in range(nb_lidar_targets):
-        lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
-    cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
-    lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
-    radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
     if SAVE:
-        np.save(f,match_modalities(cam_coords, lidar_coords, radar_coords), allow_pickle=True)
+        f = open(os.path.join(fusion_folder, "targets.npy"), "wb")
+        np.save(f, len(cam_frames), allow_pickle=True)
+    nb_frame = 201
+    for nb_frame in trange(len(cam_frames)):
+    # for nb_frame in range(4360, 4425):
+        cam_frame = cam_frames[nb_frame]
+        with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
+            radar_targets = json.load(rt_file)
+        lidar_frame = lidar_frames[nb_frame]
+        nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
+        lidar_targets = np.zeros((nb_lidar_targets, 3))
+        for i in range(nb_lidar_targets):
+            lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
+        cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
+        lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
+        radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
+        if SAVE:
+            targets_nb, match_CL, match_RL = match_modalities(cam_coords, lidar_coords, radar_coords)
+            np.save(f, targets_nb, allow_pickle=True)
+            np.save(f, match_CL, allow_pickle=True)
+            np.save(f, match_RL, allow_pickle=True)
+        else:
+            targets_nb = match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False)
+            for targets in targets_nb:
+                cam_nb, lidar_nb, radar_nb = targets
+                dist.append(lidar_coords[lidar_nb, 2])
+                error_CL.append(np.linalg.norm(cam_coords[cam_nb] - lidar_coords[lidar_nb, :2]))
+                error_RL.append(np.linalg.norm(radar_coords[radar_nb, 0] - lidar_coords[lidar_nb, 2]))
+    if SAVE:
+        f.close()
+        print(f"Fusion targets saved to {os.path.join(fusion_folder, 'targets.npy')}")
     else:
-        match_modalities(cam_coords, lidar_coords, radar_coords, verbose=not SAVE)
-if SAVE:
-    f.close()
-    print(f"Fusion targets saved to {os.path.join(fusion_folder, 'targets.npy')}")
-        
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.scatter(dist, error_CL, alpha=0.5, label='Camera-LiDAR Error')
+        plt.xlabel('LiDAR Distance (m)')
+        plt.ylabel('Camera-LiDAR Error (°)')
+        plt.title('Camera-LiDAR Error vs Distance')
+        plt.legend()
+        plt.subplot(1, 2, 2)
+        plt.scatter(dist, error_RL, alpha=0.5, label='Radar-LiDAR Error')
+        plt.xlabel('LiDAR Distance (m)')
+        plt.ylabel('Radar-LiDAR Error (m)')
+        plt.title('Radar-LiDAR Error vs Distance')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()     
     
     
