@@ -42,7 +42,7 @@ def doppler_resolution(cfar_targets, targets_data, nb_bands=3):
             cfar_target['coord'][:, 0] = idxs[:, 0] * RANGE_RESOLUTION
             cfar_target['coord'][:, 1] = (idxs[:, 1] - N_DOPPLER_BINS//2 + doppler_band*N_DOPPLER_BINS) * DOPPLER_RESOLUTION
             resolved_points.append(cfar_target)
-        elif abs(cfar_doppler) < 1.5:
+        elif abs(cfar_doppler) < 1:
             cfar_target['doppler_band'] = 0
             idxs = np.array(cfar_target['idxs'])
             cfar_target['coord'] = np.zeros_like(idxs, dtype=np.float32)
