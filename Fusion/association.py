@@ -105,7 +105,7 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    nb = "1_1"
+    nb = "1_0"
     data_folder = f"Data/{nb}/"
     # data_folder = f"D:/processed"
     image_folder = os.path.join(data_folder, "cam_targets")
@@ -133,7 +133,7 @@ if __name__ == "__main__":
         np.save(f, len(cam_frames), allow_pickle=True)
     nb_frame = 201
     for nb_frame in trange(len(cam_frames)):
-    # for nb_frame in range(4360, 4425):
+    # for nb_frame in range(200, 300):
         cam_frame = cam_frames[nb_frame]
         with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
             radar_targets = json.load(rt_file)
@@ -151,7 +151,7 @@ if __name__ == "__main__":
             np.save(f, match_CL, allow_pickle=True)
             np.save(f, match_RL, allow_pickle=True)
         else:
-            targets_nb = match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False)
+            targets_nb, match_CL, match_RL = match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False)
             for targets in targets_nb:
                 cam_nb, lidar_nb, radar_nb = targets
                 dist.append(lidar_coords[lidar_nb, 2])
