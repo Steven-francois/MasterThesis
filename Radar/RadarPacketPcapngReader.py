@@ -45,13 +45,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                         self.__start_msg[frame] = (msg_nb, i)
                     elif code == 0x02:  # Last packet of frame
                         self.__end_msg[frame] = (msg_nb, i)
-                        
-                    # if frame > previous_frame+1 or msg_nb > previous_msg_nb+1:
-                    #     for _ in range(previous_frame+1, frame):
-                    #         self.rdc_packets.append(pkt.copy())
-                    #         self.rdc_packets[-1][UDP].payload.load = bytes(b'\x00'*1436)
-                    #         print("+", end="")
-                    #     previous_frame, previous_msg_nb = frame, msg_nb
+                    
                     self.__indexes_rcd.append((frame, msg_nb, code, i))
                 elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
                     self.properties_packets.append(pkt)
@@ -62,7 +56,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     )
                     self.__indexes_prop.append((frame, msg_nb, len(self.properties_packets)-1))
             self.progress_bar(self.pcap, filter_packets, "Filtering packets")
-            for frame in self.__start_msg:
+            for frame in self.__start_msg:      # Check for missing end messages
                 if frame not in self.__end_msg and frame+1 in self.__start_msg:
                     end_msg_nb, end_idx = self.__start_msg[frame+1]
                     end_msg_nb = (end_msg_nb - 1) % 0x10000
@@ -70,7 +64,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     self.rdc_packets.append(self.rdc_packets[end_idx].copy())
                     self.rdc_packets[-1][UDP].payload.load = bytes(b'\x00'*1446)
                     self.__indexes_rcd.append((frame, end_msg_nb, 0x02, len(self.rdc_packets)-1))
-            for frame in self.__end_msg:
+            for frame in self.__end_msg:        # Check for missing start messages
                 if frame not in self.__start_msg and frame-1 in self.__end_msg:
                     start_msg_nb, start_idx = self.__end_msg[frame-1]
                     start_msg_nb = (start_msg_nb + 1) % 0x10000
@@ -150,8 +144,6 @@ class RadarPacketPcapngReader(RadarPacketReader):
         # self.radar_cube_datas = []
         # self.timestamps = []
         # self.time = []
-        start_frame = 0
-        end_frame = 0
         i = 0
         self.nb_frames = 0
         nb_packets = len(self.rdc_packets)
@@ -160,7 +152,6 @@ class RadarPacketPcapngReader(RadarPacketReader):
             while i<nb_packets:
                 while i<nb_packets and self.__indexes_rcd[i][2]!= 0x01:    # Skip invalid 1st packet of frame
                     i+=1; pbar.update(1)
-                start_frame = self.__indexes_rcd[i]
                 radar_cube_data = bytearray(self.rdc_packets[self.__indexes_rcd[i][-1]][UDP].payload.load[22+64:])
                 current_frame = self.__indexes_rcd[i][0]
                 previous_message_id = self.__indexes_rcd[i][1]
@@ -177,9 +168,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     previous_message_id = current_message_id
                     radar_cube_data.extend(self.rdc_packets[self.__indexes_rcd[i][-1]][UDP].payload.load[22:])
                     time = min(time, float(self.rdc_packets[self.__indexes_rcd[i][-1]].time))
-                    # print(str(self.rdc_packets[self.__indexes_rcd[i][-1]][UDP].payload.load[18]), end="")
                     i+=1; pbar.update(1); nb_packets_found+=1
-                end_frame = self.__indexes_rcd[i-1]
                 radar_cube_data = self.process_radar_cube_data(radar_cube_data)
                 nb_frame  = self.nb_frames % self.max_nb_frames
                 # self.timestamps.append(timestamp)
@@ -190,7 +179,6 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     # self.radar_cube_datas.append(radar_cube_data)
                     self.radar_cube_datas[nb_frame] = radar_cube_data
                 else:
-                    print(f"Start Frame: {start_frame}, End Frame: {end_frame}, Current Frame: {current_frame}")
                     # self.radar_cube_datas.append(np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64))
                     self.radar_cube_datas[nb_frame] = np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64)
                     nb_missing_frames += 1
