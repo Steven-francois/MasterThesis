@@ -3,7 +3,7 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 import os
 
-nb = "1_0"
+nb = "1_1"
 data_folder = f"Data/{nb}/"
 lidar_targets = os.path.join(data_folder, "lidar", "targets.npy")
 
@@ -18,7 +18,7 @@ geometry = o3d.geometry.PointCloud()
 test = [frame[:, :3] for frame in frames[:400] if frame is not None and len(frame) > 0]
 print(f"Number of frames with points: {len(test)}")
 print(f"First frame shape: {test[0].shape if test else 'No frames with points'}")
-geometry.points = o3d.utility.Vector3dVector(np.vstack([frame[:, :3] for frame in frames[:500] if frame is not None and len(frame) > 0]))
+geometry.points = o3d.utility.Vector3dVector(np.vstack([frame[:, :3] for frame in frames[:1000] if frame is not None and len(frame) > 0]))
 geometry.paint_uniform_color([0.1, 0.8, 0.1])  # Set initial color
 vis.add_geometry(geometry)
 o3d.visualization.draw_geometries([geometry], window_name="Background Lidar Data", width=800, height=600)

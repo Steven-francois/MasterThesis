@@ -9,14 +9,14 @@ from scipy.ndimage import gaussian_filter
 from Radar.doppler_resolution import doppler_resolution, range_doppler_resolved
 from tqdm import trange
 
-nb = "1_1"
+nb = "1_2"
 data_folder = f"Data/{nb}/"
 rdc_reader = RadarPacketPcapngReader()
 rdc_reader.load(f"{data_folder}radar_cube_data")
 can_reader = RadarCanReader()
 can_reader.load_npy(f"{data_folder}radar_can_data.npy")
 can_reader.filter_targets_speed(1, 200)
-bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-08-15-875622", "2025-05-14_14-08-57-842836", mean=True, stop_time="2025-05-14_14-09-11-042610")
+bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-13-23-147628", "2025-05-14_14-13-31-283810", mean=True, stop_time="2025-05-14_14-13-41-151709")
 radar_folder = os.path.join(data_folder, "radar")
 resolved_rdm_folder = os.path.join(data_folder, "radar", "rdm")
 targets_folder = os.path.join(data_folder, "radar", "targets")
