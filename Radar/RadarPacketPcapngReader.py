@@ -8,20 +8,46 @@ class RadarPacketPcapngReader(RadarPacketReader):
         super().__init__(filename, output_name)
         self.rdc_packets = []
         self.properties_packets = []
+        self.__indexes = []
     
     def read(self, filename=None):
         if filename is None:
             filename = self.filename
         self.filename = filename
         print(f"Reading {self.filename}")
-        # self.pcap = rdpcap(self.filename)
-        self._read_packets()
+        self.pcap = rdpcap(self.filename, count=200000)
+        # self._read_packets()
+        self.__read_packets()
         self.allocate_memory()
         self.create_files()
         self.extract_radar_cube_data()
         self.fill_properties()
         self.save()
-        
+
+    def __read_packets(self):
+            previous_frame, previous_msg_nb = 0, 0
+        # with PcapReader(self.filename) as self.pcap:
+            # def filter_packets(pkt):
+            for pkt in self.pcap:
+                if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
+                    self.rdc_packets.append(pkt)
+                    payload = pkt[UDP].payload.load
+                    frame, msg_nb, code = (
+                        int.from_bytes(payload[14:18], byteorder="big"),
+                        int.from_bytes(payload[10:12], byteorder="big"),
+                        int.from_bytes(payload[18:19], byteorder="big"),
+                    )
+                    if frame > previous_frame+1 or msg_nb > previous_msg_nb+1:
+                        for _ in range(previous_frame+1, frame):
+                            self.rdc_packets.append(pkt.copy())
+                            self.rdc_packets[-1][UDP].payload.load = bytes(b'\x00'*1436)
+                            print("+", end="")
+                        previous_frame, previous_msg_nb = frame, msg_nb
+                    self.__indexes.append((frame, msg_nb, code))
+                elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
+                    self.properties_packets.append(pkt)
+            # self.progress_bar(self.pcap, filter_packets, "Filtering packets")
+            exit(0)
 
     def _read_packets(self):
         with PcapReader(self.filename) as self.pcap:
@@ -55,6 +81,11 @@ class RadarPacketPcapngReader(RadarPacketReader):
             self.FIRST_RANGE_GATE    = int(self.fields[7])    # 0
             print(f"Range Gates: {self.N_RANGE_GATES}, Doppler Bins: {self.N_DOPPLER_BINS}, RX Channels: {self.N_RX_CHANNELS}, Chirp Types: {self.N_CHIRP_TYPES}")
 
+    def __extract_header(self, payload):
+        pass
+
+    def __extract_rcd(self):
+        pass
             
     def extract_radar_cube_data(self):
         # self.radar_cube_datas = []
@@ -162,3 +193,9 @@ class RadarPacketPcapngReader(RadarPacketReader):
 
     def __repr__(self):
         return str(self)
+    
+
+if __name__ == "__main__":
+    # Example usage
+    reader = RadarPacketPcapngReader("D://Muse//static//DATA_20250514_140309//20250514_140309//radar_eth_20250514_140309.pcapng")
+    reader.read()
