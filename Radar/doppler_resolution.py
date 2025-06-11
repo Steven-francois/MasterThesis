@@ -24,6 +24,7 @@ def doppler_resolution(cfar_targets, targets_data, nb_bands=3):
         cfar_doppler = cfar_doppler * DOPPLER_RESOLUTION -N_DOPPLER_BINS//2*DOPPLER_RESOLUTION
         candidate_dist = []
         candidate_bands = []
+        target_idxs = []
         for i in range(-nb_bands, nb_bands + 1):
             distances = np.sqrt((np.array(x) - cfar_range)**2 + (np.array(y) - (cfar_doppler+i*N_DOPPLER_BINS*DOPPLER_RESOLUTION))**2)
             if len(distances) == 0:
@@ -31,10 +32,14 @@ def doppler_resolution(cfar_targets, targets_data, nb_bands=3):
             closest_idx = np.argmin(distances)
             candidate_dist.append(distances[closest_idx])
             candidate_bands.append(i)
+            target_idxs.append(closest_idx)
         if len(candidate_dist) == 0:
             continue
         candidate_idx = np.argmin(candidate_dist)
         doppler_band = candidate_bands[candidate_idx]
+        target_idx = target_idxs[candidate_idx]
+        cfar_target['azimuth'] = targets_data[target_idx].az_angle
+        cfar_target['elevation'] = targets_data[target_idx].el_angle
         if candidate_dist[candidate_idx] < 2:
             cfar_target['doppler_band'] = doppler_band
             idxs = np.array(cfar_target['idxs'])
