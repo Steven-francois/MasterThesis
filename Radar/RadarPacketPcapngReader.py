@@ -19,11 +19,9 @@ class RadarPacketPcapngReader(RadarPacketReader):
         self.filename = filename
         print(f"Reading {self.filename}")
         # self.pcap = rdpcap(self.filename, count=100000)
-        # self._read_packets()
         self.__read_packets()
         self.allocate_memory()
         self.create_files()
-        # self.extract_radar_cube_data()
         self.__extract_rcd()
         self.fill_properties()
         self.save()
@@ -31,7 +29,6 @@ class RadarPacketPcapngReader(RadarPacketReader):
     def __read_packets(self):
         with PcapReader(self.filename) as self.pcap:
             def filter_packets(pkt):
-            # for pkt in self.pcap:
                 if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
                     i=len(self.rdc_packets)
                     self.rdc_packets.append(pkt)
@@ -87,12 +84,13 @@ class RadarPacketPcapngReader(RadarPacketReader):
                 frame, msg_nb, _ = index
                 return (frame, msg_nb)
             print("start", len(self.__start_msg), "end", len(self.__end_msg))
-            # exit(0)
             self.__indexes_rcd.sort(key=get_rcd_sort_key)
             self.__indexes_prop.sort(key=get_prop_sort_key)
             first_valid_packet = 0
-            while self.rdc_packets[self.__indexes_rcd[first_valid_packet][-1]][UDP].payload.load[18] != 0x01:
+            while self.__indexes_rcd[first_valid_packet][2] != 0x01:
                 first_valid_packet += 1
+            self.__indexes_rcd = self.__indexes_rcd[first_valid_packet:]
+                
                 
             first_payload = bytes(self.rdc_packets[0][UDP].payload)
             self.fields = self.extract_header(first_payload)
@@ -105,45 +103,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
             self.FIRST_RANGE_GATE    = int(self.fields[7])    # 0
             print(f"Range Gates: {self.N_RANGE_GATES}, Doppler Bins: {self.N_DOPPLER_BINS}, RX Channels: {self.N_RX_CHANNELS}, Chirp Types: {self.N_CHIRP_TYPES}")
 
-    def _read_packets(self):
-        with PcapReader(self.filename) as self.pcap:
-            def filter_packets(pkt):
-                if UDP in pkt and pkt[UDP].dport == self.RADAR_CUBE_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST :
-                    self.rdc_packets.append(pkt)
-                elif UDP in pkt and pkt[UDP].dport == self.BIN_PROPERTIES_UDP_PORT and pkt[IP].src == self.IP_SOURCE and pkt[IP].dst == self.IP_DEST:
-                    self.properties_packets.append(pkt)
-            self.progress_bar(self.pcap, filter_packets, "Filtering packets")
-            
-            def get_sort_key(pkt):
-                payload = pkt[UDP].payload.load
-                return (
-                    int.from_bytes(payload[14:18], byteorder="big"),
-                    int.from_bytes(payload[10:12], byteorder="big"),
-                )
-            self.rdc_packets.sort(key=get_sort_key)
-            self.properties_packets.sort(key=get_sort_key)
-            first_valid_packet = 0
-            while self.rdc_packets[first_valid_packet][UDP].payload.load[18] != 0x01:
-                first_valid_packet += 1
-            self.rdc_packets = self.rdc_packets[first_valid_packet:]
-            first_payload = bytes(self.rdc_packets[0][UDP].payload)
-            self.fields = self.extract_header(first_payload)
-            
-            # Define radar cube dimensions
-            self.N_RANGE_GATES       = int(self.fields[6])    # 200
-            self.N_DOPPLER_BINS      = int(self.fields[8])    # 128
-            self.N_RX_CHANNELS       = int(self.fields[9])    # 8
-            self.N_CHIRP_TYPES       = int(self.fields[10])   # 2
-            self.FIRST_RANGE_GATE    = int(self.fields[7])    # 0
-            print(f"Range Gates: {self.N_RANGE_GATES}, Doppler Bins: {self.N_DOPPLER_BINS}, RX Channels: {self.N_RX_CHANNELS}, Chirp Types: {self.N_CHIRP_TYPES}")
-
-    def __extract_header(self, payload):
-        pass
-
     def __extract_rcd(self):
-        # self.radar_cube_datas = []
-        # self.timestamps = []
-        # self.time = []
         i = 0
         self.nb_frames = 0
         nb_packets = len(self.rdc_packets)
@@ -164,22 +124,17 @@ class RadarPacketPcapngReader(RadarPacketReader):
                     if current_message_id > previous_message_id + 1:
                         for _ in range(previous_message_id+1, current_message_id):
                             radar_cube_data.extend(bytes(b'\x00'*1436))
-                        # print("+", end="")
                     previous_message_id = current_message_id
                     radar_cube_data.extend(self.rdc_packets[self.__indexes_rcd[i][-1]][UDP].payload.load[22:])
                     time = min(time, float(self.rdc_packets[self.__indexes_rcd[i][-1]].time))
                     i+=1; pbar.update(1); nb_packets_found+=1
                 radar_cube_data = self.process_radar_cube_data(radar_cube_data)
                 nb_frame  = self.nb_frames % self.max_nb_frames
-                # self.timestamps.append(timestamp)
-                # self.time.append(time)
                 self.timestamps[nb_frame] = timestamp
                 self.time[nb_frame] = time
                 if radar_cube_data is not None:
-                    # self.radar_cube_datas.append(radar_cube_data)
                     self.radar_cube_datas[nb_frame] = radar_cube_data
                 else:
-                    # self.radar_cube_datas.append(np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64))
                     self.radar_cube_datas[nb_frame] = np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64)
                     nb_missing_frames += 1
                 self.nb_frames += 1
@@ -190,58 +145,7 @@ class RadarPacketPcapngReader(RadarPacketReader):
             self.save_radar_cube_data()
         print(f"\nProcessed Radar Cube Data: {self.nb_frames} frames with {nb_missing_frames} missing frames")
             
-    def extract_radar_cube_data(self):
-        # self.radar_cube_datas = []
-        # self.timestamps = []
-        # self.time = []
-        
-        i = 0
-        self.nb_frames = 0
-        nb_packets = len(self.rdc_packets)
-        nb_missing_frames = 0
-        with tqdm(total=nb_packets, desc="Extracting RDC") as pbar:
-            while i<nb_packets:
-                while i<nb_packets and self.rdc_packets[i][UDP].payload.load[18] != 0x01:    # Skip invalid 1st packet of frame
-                    i+=1; pbar.update(1)
-                
-                radar_cube_data = bytearray(self.rdc_packets[i][UDP].payload.load[22+64:])
-                current_frame = self.rdc_packets[i][UDP].payload.load[14:18]
-                previous_message_id = int.from_bytes(self.rdc_packets[i][UDP].payload.load[10:12], byteorder="big")
-                timestamp = np.frombuffer(self.rdc_packets[i][UDP].payload.load[30:38], dtype=self.dt_uint64)[0]
-                time = float(self.rdc_packets[i].time) #received time
-                i+=1; pbar.update(1)
-                nb_packets_found = 1
-                while i<nb_packets and self.rdc_packets[i][UDP].payload.load[18] != 0x01 and self.rdc_packets[i][UDP].payload.load[14:18] == current_frame:
-                    current_message_id = int.from_bytes(self.rdc_packets[i][UDP].payload.load[10:12], byteorder="big")
-                    if current_message_id > previous_message_id + 1:
-                        for _ in range(previous_message_id+1, current_message_id):
-                            radar_cube_data.extend(bytes(b'\x00'*1436))
-                        # print("+", end="")
-                    previous_message_id = current_message_id
-                    radar_cube_data.extend(self.rdc_packets[i][UDP].payload.load[22:])
-                    time = min(time, float(self.rdc_packets[i].time))
-                    # print(str(self.rdc_packets[i][UDP].payload.load[18]), end="")
-                    i+=1; pbar.update(1); nb_packets_found+=1
-                radar_cube_data = self.process_radar_cube_data(radar_cube_data)
-                nb_frame  = self.nb_frames % self.max_nb_frames
-                # self.timestamps.append(timestamp)
-                # self.time.append(time)
-                self.timestamps[nb_frame] = timestamp
-                self.time[nb_frame] = time
-                if radar_cube_data is not None:
-                    # self.radar_cube_datas.append(radar_cube_data)
-                    self.radar_cube_datas[nb_frame] = radar_cube_data
-                else:
-                    # self.radar_cube_datas.append(np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64))
-                    self.radar_cube_datas[nb_frame] = np.zeros((self.N_RANGE_GATES, self.N_DOPPLER_BINS, self.N_RX_CHANNELS, self.N_CHIRP_TYPES), dtype=np.complex64)
-                    nb_missing_frames += 1
-                self.nb_frames += 1
-                
-                if self.nb_frames % self.max_nb_frames == 0:
-                    self.save_radar_cube_data()
-        if self.nb_frames % self.max_nb_frames != 0:
-            self.save_radar_cube_data()
-        print(f"\nProcessed Radar Cube Data: {self.nb_frames} frames with {nb_missing_frames} missing frames")
+    
         
     def fill_properties(self):
         self.all_properties = []
