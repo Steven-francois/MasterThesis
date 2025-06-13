@@ -9,14 +9,14 @@ from scipy.ndimage import gaussian_filter
 from Radar.doppler_resolution import doppler_resolution, range_doppler_resolved
 from tqdm import trange
 
-nb = "1_1"
+nb = "11_0"
 data_folder = f"Data/{nb}/"
 rdc_reader = RadarPacketPcapngReader()
 rdc_reader.load(f"{data_folder}radar_cube_data")
 can_reader = RadarCanReader()
 can_reader.load_npy(f"{data_folder}radar_can_data.npy")
 can_reader.filter_targets_speed(1, 200)
-bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-08-15-875622", "2025-05-14_14-08-57-842836", mean=True, stop_time="2025-05-14_14-09-11-042610")
+bg_idx_start, bg_rdc, mean_rdc = background(rdc_reader, "2025-05-14_14-04-33-434514", "2025-05-14_14-05-33-574626", mean=True, stop_time="2025-05-14_14-05-56-442390")
 radar_folder = os.path.join(data_folder, "radar")
 resolved_rdm_folder = os.path.join(data_folder, "radar", "rdm")
 targets_folder = os.path.join(data_folder, "radar", "targets")
@@ -57,6 +57,8 @@ with open(os.path.join(radar_folder, f"rdm.npy"), 'wb') as f_rdm:
                 target['idxs'] = [[int(idx), int(jdx)] for idx, jdx in target['idxs']]
                 target['properties'] = [float(prop) for prop in target['properties']]
                 target['coord'] = [[float(coord[0]), float(coord[1])] for coord in target['coord']]
-            json.dump(r_targets, f)
+            json.dump({
+                'targets': r_targets,
+                'timestamp': float(rdc_reader.timestamps[i])}, f)
         
         

@@ -4,6 +4,9 @@ import json
 from scipy.optimize import linear_sum_assignment
 from tqdm import trange
 
+cam_fov = np.array((30,17))
+cam_size = np.array((640, 480))
+
 def to_cam_coord(target, cam_size, cam_fov):
     """
     Convert target coordinates to camera coordinates.
@@ -105,7 +108,7 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    nb = "1_0"
+    nb = "11_0"
     data_folder = f"Data/{nb}/"
     # data_folder = f"D:/processed"
     image_folder = os.path.join(data_folder, "cam_targets")
@@ -120,10 +123,8 @@ if __name__ == "__main__":
         num_frames = np.load(f, allow_pickle=True)
         lidar_frames = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
 
-    cam_fov = np.array((30,17))
-    cam_size = np.array((640, 480))
 
-    SAVE = True
+    SAVE = True  # Set to True to save the fusion targets
     dist = []
     error_CL = []
     error_RL = []
@@ -136,12 +137,28 @@ if __name__ == "__main__":
     # for nb_frame in range(200, 300):
         cam_frame = cam_frames[nb_frame]
         with open(os.path.join(radar_folder, f"targets_{nb_frame}.json"), "r") as rt_file:
-            radar_targets = json.load(rt_file)
+            radar_frame = json.load(rt_file)
+            radar_targets = radar_frame["targets"]
         lidar_frame = lidar_frames[nb_frame]
         nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
         lidar_targets = np.zeros((nb_lidar_targets, 3))
         for i in range(nb_lidar_targets):
-            lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
+            lidar_points = lidar_frame[lidar_frame[:, 3] == i, :3]
+            # Calculate center of rectangle for LiDAR targets
+            min_x = np.min(lidar_points[:, 0])
+            min_y = np.min(lidar_points[:, 1])
+            max_x = np.max(lidar_points[:, 0])
+            max_y = np.max(lidar_points[:, 1])
+            mean_x = (min_x + max_x) / 2
+            mean_y = (min_y + max_y) / 2
+            mean_z = np.mean(lidar_points[:, 2])
+            lidar_targets[i, 0] = mean_x
+            lidar_targets[i, 1] = mean_y
+            lidar_targets[i, 2] = mean_z
+            # Calculate center of mass for LiDAR targets
+            # lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
+        # Convert lidar targets coordinate to camera perspective
+        # lidar_targets += np.array([0, 0, -1.73])  # Adjust for the height of the LiDAR sensor
         cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
         lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
         radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
@@ -150,6 +167,19 @@ if __name__ == "__main__":
             np.save(f, targets_nb, allow_pickle=True)
             np.save(f, match_CL, allow_pickle=True)
             np.save(f, match_RL, allow_pickle=True)
+            with open(os.path.join(fusion_folder, f"targets_{nb_frame}.json"), "w") as f_json:
+                json.dump({
+                    "cam_coords": cam_coords.tolist(),
+                    "lidar_coords": lidar_coords.tolist(),
+                    "radar_coords": radar_coords.tolist(),
+                    "targets_nb": targets_nb.tolist(),
+                    "match_CL": match_CL.tolist(),
+                    "match_RL": match_RL.tolist(),
+                    "cam_frame": cam_frame.tolist(),
+                    "lidar_frame": lidar_frame.tolist(),
+                    "radar_targets": radar_targets,
+                    "timestamp": radar_frame["timestamp"]
+                }, f_json)
         else:
             targets_nb, match_CL, match_RL = match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False)
             for targets in targets_nb:

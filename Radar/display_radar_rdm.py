@@ -5,8 +5,7 @@ import time
 from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacketReader
 
 nb_file = "21"
-rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
-# rdc_file_bg = f"radar_cube_data_bg{nb_file}.npy" # Replace with your output file path
+rdc_file = f"Data/radar_test/radar_cube_data" # Replace with your output file path
 
 rdc_reader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
 rdc_reader.load()
@@ -97,8 +96,8 @@ def update(frame):
     return img, img2, timestamp_text
 
 def animate():
-    # ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
-    ani = animation.FuncAnimation(fig, update, frames=range(100,120), interval=1000)
+    ani = animation.FuncAnimation(fig, update, frames=len(radar_cube_data), interval=100)
+    # ani = animation.FuncAnimation(fig, update, frames=range(100,120), interval=1000)
 
     plt.show()
 
