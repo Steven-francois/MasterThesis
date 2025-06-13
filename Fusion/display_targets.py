@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import open3d as o3d
-from Fusion.association import to_cam_coord, to_lidar_coord, to_radar_coord
+from Fusion.association import to_cam_coord, to_lidar_coord, to_radar_coord, cam_size, cam_fov
 
 
-nb = "1_1"
+nb = "11_0"
 data_folder = f"Data/{nb}/"
 # data_folder = f"D:/processed"
 camera_folder = os.path.join(data_folder, "camera")
@@ -37,7 +37,7 @@ with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
 def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, delay=0.1):
     # Create a figure with subplots for camera and radar frames
     fig = plt.figure(figsize=(15, 10))
-    gs = gridspec.GridSpec(2, 3, width_ratios=[1, 1], height_ratios=[1, 1])
+    gs = gridspec.GridSpec(2, 3, width_ratios=[1, 1, 1], height_ratios=[1, 1])
     
     ax_cam = fig.add_subplot(gs[0, :2])
     ax_radar = fig.add_subplot(gs[1, :2])
@@ -65,6 +65,7 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
     
     # Error plots variables
     max_frame = 10
+    frame_nb_targets = []
     dist = []
     error_CL = []
     error_RL = []
@@ -103,10 +104,14 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         unassociated_color = np.array([0.5, 0.5, 0.5, 1])  # Gray for unassociated targets
         
         # Update error plots
-        if len(dist) >= max_frame:
-            del dist[0]
-            del error_CL[0]
-            del error_RL[0]
+        if len(frame_nb_targets) >= max_frame:
+            for _ in range(frame_nb_targets[0]):
+                del dist[0]
+                del error_CL[0]
+                del error_RL[0]
+            del frame_nb_targets[0]
+        frame_nb_targets.append(nb_targets)
+        
         
 
         # Display camera frame
@@ -124,14 +129,19 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                     edgecolor = unassociated_color
                 ax_cam.add_patch(plt.Rectangle((x,y), target[2], target[3], fill=False, edgecolor=edgecolor, linewidth=2))
                 ax_cam.text(x, y, f'Target {i}', color='blue', fontsize=8)
+        ax_cam.vlines(320, 0, 480, color='red', linestyle='--')  # Vertical line at center
+        ax_cam.hlines(240, 0, 640, color='blue', linestyle='--')  # Horizontal line at center
         ax_cam.set_xlim(0, 640)
         ax_cam.set_ylim(480, 0)
         ax_cam.axis('off')
         
+        cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
+        
         # Display radar frame
         radar_file = os.path.join(radar_folder, f"targets_{frame}.json")
         with open(radar_file, 'r') as f:
-            radar_targets = json.load(f)
+            radar_frame = json.load(f)
+            radar_targets = radar_frame["targets"]
             # radar_targets = np.array(radar_targets)[radar_idx] if len(radar_targets) > 0 and len(radar_idx) > 0 else []
         ax_radar.clear()
         ax_radar.set_title(f'Radar Targets Frame {frame}')
@@ -149,6 +159,8 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 ax_radar.text(x, y, f'Target {i}', color=color, fontsize=8)
         ax_radar.set_xlim(-50, 50)
         ax_radar.set_ylim(0, 90)
+    
+        radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
         
         plt.tight_layout()
         
@@ -185,6 +197,37 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         vis.update_geometry(geometry)
         vis.poll_events()
         vis.update_renderer()
+        
+        nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
+        lidar_targets = np.zeros((nb_lidar_targets, 3))
+        for i in range(nb_lidar_targets):
+            lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
+        lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
+        
+        for i in range(nb_targets):
+            dist.append(lidar_coords[lidar_idx[i], 2])
+            error_CL.append(np.linalg.norm(cam_coords[cam_idx[i]] - lidar_coords[lidar_idx[i], :2]))
+            error_RL.append(np.linalg.norm(radar_coords[radar_idx[i], 0] - lidar_coords[lidar_idx[i], 2]))
+            
+        
+        # Update error plots
+        ax_cam_error.clear()
+        ax_cam_error.plot(dist, error_CL, 'o', color='blue', label='Camera-LiDAR Error')
+        ax_cam_error.set_title('Camera-LiDAR Error')
+        ax_cam_error.set_xlabel('LiDAR Distance (m)')
+        ax_cam_error.set_ylabel('Camera-LiDAR Error (°)')
+        ax_cam_error.legend()
+        ax_cam_error.set_xlim(0, 100)
+        ax_cam_error.set_ylim(0, 10)
+        ax_radar_error.clear()
+        ax_radar_error.plot(dist, error_RL, 'o', color='red', label='Radar-LiDAR Error')
+        ax_radar_error.set_title('Radar-LiDAR Error')
+        ax_radar_error.set_xlabel('LiDAR Distance (m)')
+        ax_radar_error.set_ylabel('Radar-LiDAR Error (m)')
+        ax_radar_error.set_xlim(0, 100)
+        ax_radar_error.set_ylim(0, 10)
+        ax_radar_error.legend()
+        
     
     ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
     # ani = animation.FuncAnimation(fig, update, frames=range(200, 300), interval=delay * 1000)
