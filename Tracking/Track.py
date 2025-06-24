@@ -9,14 +9,13 @@ class Track:
         Track.count += 1
         self. history = [detection]
         self.time_since_update = 0
-        # self.last_update_time = detection["timestamp"]
         self.last_update_time = ts
         
     def predict(self, new_timestamp):
         self.time_since_update += 1
         
         # Radar prediction
-        radar_coord = self.history[-1]#["radar_coord"]
+        radar_coord = self.history[-1][2]
         dt = new_timestamp - self.last_update_time
         new_radar_coord = (radar_coord[0] + radar_coord[1] * dt, radar_coord[1])
         prediction = {
@@ -28,7 +27,6 @@ class Track:
     def update(self, detection, ts):
         self.history.append(detection)
         self.time_since_update = 0
-        # self.last_update_time = detection["timestamp"]
         self.last_update_time = ts
 
 
@@ -38,7 +36,7 @@ def compute_cost(tracks, detections):
     for i, track in enumerate(tracks):
         pred = track.predict(detections["timestamp"])
         for j in range(len(detections["targets_nb"])):
-            cost[i, j] = np.linalg.norm(np.array(pred["radar_coord"]) - np.array(detections["radar_coords"][j]))
+            cost[i, j] = np.linalg.norm(np.array(pred["radar_coord"]) - np.array(detections["targets"][j][2]))
     return cost
 
 def associate_tracks_and_detections(tracks, detections, max_age=5):
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     
     nb = "11_0"
     data_folder = f"Data/{nb}/"
-    # data_folder = f"D:/processed"
+    data_folder = f"D:/p_{nb}/"
     fusion_folder = os.path.join(data_folder, "fusion")
     with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
         num_frames = np.load(f, allow_pickle=True)
@@ -84,18 +82,16 @@ if __name__ == "__main__":
     old_tracks = []
     max_age = 5
     
-    for detections in tqdm(frames[120:200], desc="Tracking Progress"):
-        print(detections)
-        cost = compute_cost(tracks, detections) if tracks else np.zeros((0, len(detections)))
+    for detections in tqdm(frames[120:180], desc="Tracking Progress"):
         matches, unmatched_tracks, unmatched_dets = associate_tracks_and_detections(tracks, detections, max_age)
         
         # Update matched tracks
         for i, j in matches:
-            tracks[i].update(detections["radar_coords"][j],  detections["timestamp"])
+            tracks[i].update(detections["targets"][j],  detections["timestamp"])
             
         # Create new tracks for unmatched detections
         for j in unmatched_dets:
-            new_track = Track(detections["radar_coords"][j], detections["timestamp"])
+            new_track = Track(detections["targets"][j], detections["timestamp"])
             tracks.append(new_track)
             
         # Remove old tracks
@@ -106,10 +102,10 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 6))
     for track in tracks:
-        coords = np.array([detection for detection in track.history])
+        coords = np.array([detection[2] for detection in track.history])
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
     for track in old_tracks:
-        coords = np.array([detection for detection in track.history])
+        coords = np.array([detection[2] for detection in track.history])
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
     plt.xlabel('range coordinate (m)')
     plt.ylabel('Doppler coordinate (m/s)')
