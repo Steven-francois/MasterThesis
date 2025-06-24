@@ -109,8 +109,8 @@ def match_modalities(cam_coords, lidar_coords, radar_coords, verbose=False):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     nb = "11_0"
-    data_folder = f"Data/{nb}/"
-    # data_folder = f"D:/processed"
+    # data_folder = f"Data/{nb}/"
+    data_folder = f"D:/p_{nb}"
     image_folder = os.path.join(data_folder, "cam_targets")
     lidar_folder = os.path.join(data_folder, "lidar")
     radar_folder = os.path.join(data_folder, "radar", "targets")
@@ -162,8 +162,19 @@ if __name__ == "__main__":
         cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
         lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
         radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
+
         if SAVE:
             targets_nb, match_CL, match_RL = match_modalities(cam_coords, lidar_coords, radar_coords)
+            cam_targets = cam_coords[targets_nb[:, 0]].tolist() if len(targets_nb) > 0 else []
+            lidar_targets = lidar_coords[targets_nb[:, 1]].tolist() if len(targets_nb) > 0 else []
+            radar_targets = radar_coords[targets_nb[:, 2]].tolist() if len(targets_nb) > 0 else []
+            targets = list(zip(cam_targets, lidar_targets, radar_targets))
+            cam_cl_targets = cam_coords[match_CL[:, 0]].tolist() if len(match_CL) > 0 else []
+            lidar_cl_targets = lidar_coords[match_CL[:, 1]].tolist() if len(match_CL) > 0 else []
+            cl_targets = list(zip(cam_cl_targets, lidar_cl_targets))
+            radar_rl_targets = radar_coords[match_RL[:, 0]].tolist() if len(match_RL) > 0 else []
+            lidar_rl_targets = lidar_coords[match_RL[:, 1]].tolist() if len(match_RL) > 0 else []
+            rl_targets = list(zip(radar_rl_targets, lidar_rl_targets))
             np.save(f, targets_nb, allow_pickle=True)
             np.save(f, match_CL, allow_pickle=True)
             np.save(f, match_RL, allow_pickle=True)
@@ -175,6 +186,9 @@ if __name__ == "__main__":
                     "targets_nb": targets_nb.tolist(),
                     "match_CL": match_CL.tolist(),
                     "match_RL": match_RL.tolist(),
+                    "targets": targets,
+                    "cl_targets": cl_targets,
+                    "rl_targets": rl_targets,
                     "cam_frame": cam_frame.tolist(),
                     "lidar_frame": lidar_frame.tolist(),
                     "radar_targets": radar_targets,
