@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from filterpy.kalman import KalmanFilter
 
 class Track:
     count = 0
@@ -10,6 +11,7 @@ class Track:
         self. history = [detection]
         self.time_since_update = 0
         self.last_update_time = ts
+        self.predictions = []
         
     def predict(self, new_timestamp):
         self.time_since_update += 1
@@ -29,12 +31,72 @@ class Track:
         self.time_since_update = 0
         self.last_update_time = ts
 
+class TrackRadar(Track):
+    def __init__(self, detection, ts):
+        super().__init__(detection, ts)
+        self.radar_coord = detection[2]  # Assuming detection[2] contains radar coordinates
+
+        # Initialization of Kalman filter
+        kf = KalmanFilter(dim_x=4, dim_z=2)
+        dt = 1.0  # frame time step
+        kf.F = np.array([[1, dt, 0, 0],
+                         [0, 1, 0,  0],
+                         [0, 0, 1, dt],
+                         [0, 0, 0,  1]])  # state transition
+
+        kf.H = np.array([[1, 0, 0, 0],
+                         [0, 1, 0, 0]])    # measurement function
+
+        kf.R *= 0.9   # measurement noise
+        kf.P *= 10.0  # initial uncertainty
+        kf.Q *= 0.1   # process noise
+
+        kf.x[:2] = np.array(self.radar_coord).reshape(2, 1)
+        self.kf = kf
+
+    def __state_transition_dt(self, dt):
+        self.kf.F = np.array([[1, 0, dt, 0],
+                              [0, 1, 0, dt],
+                              [0, 0, 1,  0],
+                              [0, 0, 0,  1]])  # state transition
+
+    def predict(self, new_timestamp, kalman=False):
+        self.time_since_update += 1
+        dt = new_timestamp - self.last_update_time
+        
+        # Radar prediction
+        if kalman:
+            self.__state_transition_dt(dt)
+            self.kf.predict()
+            self.time_since_update += 1
+            prediction = {
+                "radar_coord": self.kf.x[:2].reshape(-1),  # return [x, y]
+                "timestamp": new_timestamp
+            }
+        else:
+            new_radar_coord = (self.radar_coord[0] + self.radar_coord[1] * dt, self.radar_coord[1])
+            prediction = {
+                "radar_coord": new_radar_coord,
+                "timestamp": new_timestamp
+            }
+        self.predictions.append(prediction["radar_coord"])
+        return prediction
+    
+    def update(self, detection, ts):
+        super().update(detection, ts)
+        self.radar_coord = detection[2]
+        self.kf.update(np.array(self.radar_coord).reshape(2, 1))  # Update Kalman filter with new measurement
+
+class TrackLidar(Track):
+    def __init__(self, detection, ts):
+        super().__init__(detection, ts)
+        self.lidar_coord = detection[1]
 
 # --- Track management functions
 def compute_cost(tracks, detections):
     cost = np.zeros((len(tracks), len(detections["targets_nb"])))
     for i, track in enumerate(tracks):
-        pred = track.predict(detections["timestamp"])
+        pred = track.predict(detections["timestamp"], True)
         for j in range(len(detections["targets_nb"])):
             cost[i, j] = np.linalg.norm(np.array(pred["radar_coord"]) - np.array(detections["targets"][j][2]))
     return cost
@@ -91,7 +153,7 @@ if __name__ == "__main__":
             
         # Create new tracks for unmatched detections
         for j in unmatched_dets:
-            new_track = Track(detections["targets"][j], detections["timestamp"])
+            new_track = TrackRadar(detections["targets"][j], detections["timestamp"])
             tracks.append(new_track)
             
         # Remove old tracks
@@ -103,10 +165,16 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 6))
     for track in tracks:
         coords = np.array([detection[2] for detection in track.history])
+        preds = np.array(track.predictions)
+        print(f"Track {track.id} history: {coords}")
+        print(f"Track {track.id} predictions: {preds}")
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
+        plt.plot(preds[:, 0], preds[:, 1], linestyle='-.', label=f'Predicted {track.id}')
     for track in old_tracks:
         coords = np.array([detection[2] for detection in track.history])
+        preds = np.array(track.predictions)
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
+        plt.plot(preds[:, 0], preds[:, 1], linestyle='-.', label=f'Predicted {track.id} (old)', alpha=0.5)
     plt.xlabel('range coordinate (m)')
     plt.ylabel('Doppler coordinate (m/s)')
     plt.title('Tracked Targets Over Time')
