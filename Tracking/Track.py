@@ -252,26 +252,58 @@ if __name__ == "__main__":
     data_folder = f"Data/{nb}/"
     # data_folder = f"D:/p_{nb}/"
     fusion_folder = os.path.join(data_folder, "fusion")
+    tracks_folder = os.path.join(data_folder, "tracks")
+    
+    tracking_interval = slice(300, 540)
+    # tracking_interval = slice(2500, 2800)
+    # tracking_interval = slice(2500, 2600)
+    # tracking_interval = slice(3228, 3300)
+    # tracking_interval = slice(0, 450)
+    # tracking_interval =  slice(2500, 3000)
+    
+    
     with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
         num_frames = np.load(f, allow_pickle=True)
         fusion_frames = []
         CL_frames = []
         RL_frames = []
         frames = []
+        tracks_id = []
+        ts = []
+        min_id = 1
+        max_id = 0
         for i in range(num_frames):
             fusion_frames.append(np.load(f, allow_pickle=True))
             CL_frames.append(np.load(f, allow_pickle=True))
             RL_frames.append(np.load(f, allow_pickle=True))
             with open(os.path.join(fusion_folder, f"targets_{i}.json"), 'r') as json_file:
                 frame_data = json.load(json_file)
+                ts.append(frame_data["timestamp"])
                 frames.append(frame_data)
+        for i in range(tracking_interval.start, tracking_interval.stop):
+            with open(os.path.join(tracks_folder, f"frame_{i:04d}.json"), 'r') as json_file:
+                track_data = json.load(json_file)["tracks"]
+                if len(track_data) > 0:
+                    min_id = min(min_id, min(track_data))
+                    max_id = max(max_id, max(track_data))
+                tracks_id.append(track_data)
 
-    tracking_interval = slice(300, 435)
-    # tracking_interval = slice(2500, 2800)
-    # tracking_interval = slice(2500, 2600)
-    # tracking_interval = slice(3228, 3300)
-    # tracking_interval = slice(0, 450)
-    # tracking_interval =  slice(2500, 3000)
+    
+    print(min_id, max_id)
+    gt_tracks = []
+    for i in range(min_id, max_id + 1):
+        t = []
+        for ids in tracks_id:
+            if i in ids:
+                t.append(ids.index(i))
+            else:
+                t.append(-1)
+        print(f"Ground truth track {i}: {t}")
+        gt_tracks.append(t)
+    print(f"Number of ground truth tracks: {len(gt_tracks)}")
+    print()
+
+    
     
     tracks = []
     old_tracks = []
@@ -300,7 +332,7 @@ if __name__ == "__main__":
         coords = np.array([detection[2] for detection in track.history])
         preds = np.array(track.radar_predictions)
         # print(f"Track {track.id} history: {coords}")
-        print(f"Track {track.id} predictions: {preds}")
+        # print(f"Track {track.id} predictions: {preds}")
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
         # plt.plot(preds[:, 0], preds[:, 1], linestyle='-', label=f'Predicted {track.id}') if len(preds) > 0 else None
     for track in old_tracks:
@@ -342,7 +374,7 @@ if __name__ == "__main__":
             # Remove old tracks
             old_tracks_lidar.extend([track for track in tracks_lidar if track.time_since_update > max_age])
             tracks_lidar = [track for track in tracks_lidar if track.time_since_update <= max_age]
-            print(tracks_dets)
+            # print(tracks_dets)
             np.save(f, tracks_dets)
         
     # Plotting the results
@@ -416,7 +448,7 @@ if __name__ == "__main__":
         coords = np.array([detection[2] for detection in track.history])
         preds = np.array(track.radar_predictions)
         # print(f"Track {track.id} history: {coords}")
-        print(f"Track {track.id} predictions: {preds}")
+        # print(f"Track {track.id} predictions: {preds}")
         plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
         # plt.plot(preds[:, 0], preds[:, 1], linestyle='-', label=f'Predicted {track.id}') if len(preds) > 0 else None
     for track in old_tracks_fusion:
@@ -432,6 +464,8 @@ if __name__ == "__main__":
     plt.show()
 
     # Plotting selected targets for each track
+    for i, track in enumerate(gt_tracks):
+        plt.plot(np.array(ts[tracking_interval]) + 0.03, track, marker='o', label=f'Track_gt {i} NBs')
     for track in tracks_fusion:
         plt.plot(np.array(track.history_ts) + 0.02, track.nbs, marker='o', label=f'Track_fusion {track.id} NBs')
     for track in old_tracks_fusion:
