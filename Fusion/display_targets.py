@@ -10,7 +10,7 @@ from Fusion.association import to_cam_coord, to_lidar_coord, to_radar_coord, cam
 
 nb = "11_0"
 data_folder = f"Data/{nb}/"
-# data_folder = f"D:/processed"
+# data_folder = f"D:/p_{nb}/"
 camera_folder = os.path.join(data_folder, "camera")
 camera_target_folder = os.path.join(data_folder, "cam_targets")
 lidar_folder = os.path.join(data_folder, "lidar")
@@ -32,17 +32,23 @@ with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
         fusion_frames.append(np.load(f, allow_pickle=True))
         CL_frames.append(np.load(f, allow_pickle=True))
         RL_frames.append(np.load(f, allow_pickle=True))
+with open(os.path.join(fusion_folder, "tracks_lidar.npy"), "rb") as f:
+    frame_slice = np.load(f, allow_pickle=True).tolist()
+    num_frames = frame_slice.stop - frame_slice.start
+    track_ids = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
 
 
-def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, delay=0.1):
+def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, track_ids, delay=0.1):
     # Create a figure with subplots for camera and radar frames
     fig = plt.figure(figsize=(15, 10))
     gs = gridspec.GridSpec(2, 3, width_ratios=[1, 1, 1], height_ratios=[1, 1])
     
-    ax_cam = fig.add_subplot(gs[0, :2])
-    ax_radar = fig.add_subplot(gs[1, :2])
-    ax_cam_error = fig.add_subplot(gs[0, 2])
-    ax_radar_error = fig.add_subplot(gs[1, 2])
+    ax_cam = fig.add_subplot(gs[0, :])
+    ax_radar = fig.add_subplot(gs[1, :])
+    # ax_cam = fig.add_subplot(gs[0, :2])
+    # ax_radar = fig.add_subplot(gs[1, :2])
+    # ax_cam_error = fig.add_subplot(gs[0, 2])
+    # ax_radar_error = fig.add_subplot(gs[1, 2])
     
     
     
@@ -88,11 +94,16 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         ax_cam.clear()
         ax_radar.clear()
 
+        # Track IDs for current frame
+        track_id = track_ids[frame - frame_slice.start] if frame - frame_slice.start < len(track_ids) else np.array([])
+
         fusion_frame = fusion_frames[frame]
         nb_targets = fusion_frame.shape[0]
+        nb_tracks = len(track_id)
         cam_idx, lidar_idx, radar_idx = fusion_frame.T.astype(int)
         print(cam_idx, lidar_idx, radar_idx)
         colors = plt.get_cmap("tab10")(np.arange(nb_targets) / nb_targets) if nb_targets > 0 else np.array([[0, 0, 0, 0]])
+        colors_tracks = plt.get_cmap("tab10")(np.arange(nb_tracks) / nb_tracks) if nb_tracks > 0 else np.array([[0, 0, 0, 0]])
         CL_frame = CL_frames[frame]
         RL_frame = RL_frames[frame]
         nb_CL_targets = CL_frame.shape[0] if len(CL_frame) > 0 else 0
@@ -101,6 +112,7 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
         cam_CL_idx, lidar_CL_idx = CL_frame.T.astype(int) if len(CL_frame) > 0 else ([], [])
         radar_RL_idx, lidar_RL_idx = RL_frame.T.astype(int) if len(RL_frame) > 0 else ([], [])
         single_color = plt.get_cmap("Pastel1")(np.arange(nb_single_targets) / nb_single_targets) if nb_single_targets > 0 else np.array([[0, 0, 0, 0]])
+        single_color = np.zeros((nb_single_targets, 4)) 
         unassociated_color = np.array([0.5, 0.5, 0.5, 1])  # Gray for unassociated targets
         
         # Update error plots
@@ -123,14 +135,23 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 x, y = target[0]-target[2]/2, target[1]-target[3]/2  # Center the rectangle
                 if i in cam_idx:
                     edgecolor = colors[np.where(cam_idx == i)[0][0]]
-                elif i in cam_CL_idx:
-                    edgecolor = single_color[np.where(cam_CL_idx == i)[0][0]]
+                    idx = np.where(cam_idx == i)[0][0]
+                    if idx in track_id:
+                        current_track_id = np.where(track_id == idx)[0][0]
+                        print(f"Target {i} is tracked with ID {current_track_id}")
+                        if current_track_id == -1:
+                            edgecolor = unassociated_color
+                        else:
+                            edgecolor = colors_tracks[current_track_id]
+                            ax_cam.text(x, y, f'Target {current_track_id}', color=edgecolor, fontsize=8)
+                # elif i in cam_CL_idx:
+                #     edgecolor = single_color[np.where(cam_CL_idx == i)[0][0]]
                 else:
                     edgecolor = unassociated_color
                 ax_cam.add_patch(plt.Rectangle((x,y), target[2], target[3], fill=False, edgecolor=edgecolor, linewidth=2))
                 ax_cam.text(x, y, f'Target {i}', color='blue', fontsize=8)
-        ax_cam.vlines(320, 0, 480, color='red', linestyle='--')  # Vertical line at center
-        ax_cam.hlines(240, 0, 640, color='blue', linestyle='--')  # Horizontal line at center
+        # ax_cam.vlines(320, 0, 480, color='red', linestyle='--')  # Vertical line at center
+        # ax_cam.hlines(240, 0, 640, color='blue', linestyle='--')  # Horizontal line at center
         ax_cam.set_xlim(0, 640)
         ax_cam.set_ylim(480, 0)
         ax_cam.axis('off')
@@ -151,14 +172,24 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 x, y = coord[1], coord[0]
                 if i in radar_idx:
                     color = colors[np.where(radar_idx == i)[0][0]]
-                elif i in radar_RL_idx:
-                    color = single_color[np.where(radar_RL_idx == i)[0][0]+nb_CL_targets]
+                    idx = np.where(radar_idx == i)[0][0]
+                    if idx in track_id:
+                        current_track_id = np.where(track_id == idx)[0][0]
+                        color = colors_tracks[current_track_id]
+                        ax_radar.text(x, y, f'Target {current_track_id}', color=color, fontsize=8)
+                    else:
+                        color = unassociated_color
+                # elif i in radar_RL_idx:
+                #     color = single_color[np.where(radar_RL_idx == i)[0][0]+nb_CL_targets]
                 else:
                     color = unassociated_color
                 ax_radar.scatter(x, y, c=color, label='Radar Target')
-                ax_radar.text(x, y, f'Target {i}', color=color, fontsize=8)
+                # ax_radar.text(x, y, f'Target {i}', color=color, fontsize=8)
         ax_radar.set_xlim(-50, 50)
         ax_radar.set_ylim(0, 90)
+        ax_radar.set_xlabel("Speed (m/s)")
+        ax_radar.set_ylabel("Range (m)")
+
     
         radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
         
@@ -179,6 +210,12 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                 if target_id in lidar_idx:
                     idx = np.where(lidar_idx == target_id)[0][0]
                     color = colors[idx][:3]
+                    if idx in track_id:
+                        current_track_id = np.where(track_id == idx)[0][0]
+                        if current_track_id == -1:
+                            color = unassociated_color[:3]
+                        else:
+                            color = colors_tracks[current_track_id][:3]
                 elif target_id in lidar_CL_idx:
                     idx = np.where(lidar_CL_idx == target_id)[0][0]
                     color = single_color[idx][:3]
@@ -211,30 +248,31 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
             
         
         # Update error plots
-        ax_cam_error.clear()
-        ax_cam_error.plot(dist, error_CL, 'o', color='blue', label='Camera-LiDAR Error')
-        ax_cam_error.set_title('Camera-LiDAR Error')
-        ax_cam_error.set_xlabel('LiDAR Distance (m)')
-        ax_cam_error.set_ylabel('Camera-LiDAR Error (°)')
-        ax_cam_error.legend()
-        ax_cam_error.set_xlim(0, 100)
-        ax_cam_error.set_ylim(0, 10)
-        ax_radar_error.clear()
-        ax_radar_error.plot(dist, error_RL, 'o', color='red', label='Radar-LiDAR Error')
-        ax_radar_error.set_title('Radar-LiDAR Error')
-        ax_radar_error.set_xlabel('LiDAR Distance (m)')
-        ax_radar_error.set_ylabel('Radar-LiDAR Error (m)')
-        ax_radar_error.set_xlim(0, 100)
-        ax_radar_error.set_ylim(0, 10)
-        ax_radar_error.legend()
+        # ax_cam_error.clear()
+        # ax_cam_error.plot(dist, error_CL, 'o', color='blue', label='Camera-LiDAR Error')
+        # ax_cam_error.set_title('Camera-LiDAR Error')
+        # ax_cam_error.set_xlabel('LiDAR Distance (m)')
+        # ax_cam_error.set_ylabel('Camera-LiDAR Error (°)')
+        # ax_cam_error.legend()
+        # ax_cam_error.set_xlim(0, 100)
+        # ax_cam_error.set_ylim(0, 10)
+        # ax_radar_error.clear()
+        # ax_radar_error.plot(dist, error_RL, 'o', color='red', label='Radar-LiDAR Error')
+        # ax_radar_error.set_title('Radar-LiDAR Error')
+        # ax_radar_error.set_xlabel('LiDAR Distance (m)')
+        # ax_radar_error.set_ylabel('Radar-LiDAR Error (m)')
+        # ax_radar_error.set_xlim(0, 100)
+        # ax_radar_error.set_ylim(0, 10)
+        # ax_radar_error.legend()
         
     
-    ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
-    # ani = animation.FuncAnimation(fig, update, frames=range(200, 300), interval=delay * 1000)
+    # ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
+    ani = animation.FuncAnimation(fig, update, frames=range(300, 560), interval=delay * 1000)
+    # ani = animation.FuncAnimation(fig, update, frames=range(1204, 1241), interval=delay * 1000)
     plt.show()
     
 if __name__ == "__main__":
-    display_fusion_animation(image_files, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, delay=0.1)
+    display_fusion_animation(image_files, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, track_ids, delay=0.1)
     
     # Optionally save the animation as a video
     # ani.save('fusion_animation.mp4', writer='ffmpeg', fps=10)

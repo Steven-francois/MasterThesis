@@ -10,7 +10,8 @@ import pandas as pd
 from scipy.interpolate import CubicSpline
 
 nb_file = "1_0"
-data_folder = f"Data/{nb_file}/"
+# data_folder = f"Data/{nb_file}/"
+data_folder = f"D:/{nb_file}/"
 image_folder = f"{data_folder}camera/"
 rdc_file = f"{data_folder}radar_cube_data" # Replace with your output file path
 plot_folder = f"Fusion/plots/{nb_file}"
