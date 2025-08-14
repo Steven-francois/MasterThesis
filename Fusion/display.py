@@ -9,7 +9,7 @@ import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
-nb_file = "1_0"
+nb_file = "11_0"
 data_folder = f"Data/{nb_file}/"
 image_folder = f"{data_folder}camera/"
 rdc_file = f"{data_folder}radar_cube_data" # Replace with your output file path
@@ -123,8 +123,9 @@ fig = plt.figure(figsize=(10, 7))
 gs = gridspec.GridSpec(4,4)
 gs.update(wspace=1, hspace=1)
 ax = plt.subplot(gs[0:2, :])
-ax2 = plt.subplot(gs[2:, :-1])
-ax3 = plt.subplot(gs[2:, -1])
+ax2 = plt.subplot(gs[2:, :])
+# ax2 = plt.subplot(gs[2:, :-1])
+# ax3 = plt.subplot(gs[2:, -1])
 # fig, (ax, ax2) = plt.subplots(2, figsize=(10, 14))
 img = ax.imshow(np.zeros((N_RANGE_GATES, N_DOPPLER_BINS)), vmin=0, vmax=100, aspect='auto', cmap='jet', origin='lower')
 ax.set_xlabel("Doppler Bins (m/s)")
@@ -134,9 +135,9 @@ ax.set_title("Real-Time Range-Doppler Map")
 img2 = ax2.imshow(np.zeros(image_size))
 fig.colorbar(img, label="Magnitude (dB)")
 timestamp_text = ax.text(xmin, ymin, "", color="white", fontsize=12, bbox=dict(facecolor='black', alpha=0.5))
-speed_bar = ax3.bar(0.5, 0, width=2)
-ax3.set(xlim=(0, 1), ylim=(0, 50), xticks=np.arange(0, 1, 1), yticks=np.arange(0, 50, 5))
-ax3.set_title("Speed (km/h)")
+# speed_bar = ax3.bar(0.5, 0, width=2)
+# ax3.set(xlim=(0, 1), ylim=(0, 50), xticks=np.arange(0, 1, 1), yticks=np.arange(0, 50, 5))
+# ax3.set_title("Speed (km/h)")
 
 
 global_min_intensity = min([min(lidar_frame[:, 3]) for lidar_frame in lidar_frames if len(lidar_frame) > 0])
@@ -168,6 +169,8 @@ vc = vis.get_view_control()
 vc.set_front(front)
 vc.set_lookat(lookat)
 vc.set_up(up)
+vis.poll_events()
+vis.update_renderer()
 
 # def interp_speed(target_timestamp):
 #     new_speed = np.interp(target_timestamp, speed_frame_timestamps, speed)
@@ -210,7 +213,7 @@ def update(frame):
     img2.set_data(image)
     ax2.axis('off')
     # Set speed
-    speed_bar[0].set_height(speed[frame])
+    # speed_bar[0].set_height(speed[frame])
     # ax3.bar(0.5, speed[frame], width=1)
     
     # Set LiDAR data
@@ -253,7 +256,8 @@ def update(frame):
     img.set_data(range_doppler_matrix)
     # img.set_extent([xmax, xmin, yt_bottom, yt_top])
     img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-    timestamp_text.set_text(f"Timestamp: {frame}")
+    # timestamp_text.set_text(f"Timestamp: {frame}")
+    timestamp_text.set_text(f"Frame: {frame}")
         
     # if image_filenames[frame] in Ids:
     #     # idx = np.where(Ids == image_filenames[frame])[0][0]
@@ -286,7 +290,7 @@ def update_old(frame):
     ax2.axis('off')
     # Set speed
     if image_frame_timestamps[frame] >= speed_frame_timestamps[speed_idx]:
-        speed_bar[0].set_height(speed[speed_idx])
+        # speed_bar[0].set_height(speed[speed_idx])
         # ax3.bar(0.5, speed[frame], width=1)
         if speed_idx < len(speed_frame_timestamps)-1:
             speed_idx += 1

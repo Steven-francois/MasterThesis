@@ -3,7 +3,7 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 import os
 
-nb = "1_1"
+nb = "11_0"
 data_folder = f"Data/{nb}/"
 lidar_targets = os.path.join(data_folder, "lidar", "targets.npy")
 

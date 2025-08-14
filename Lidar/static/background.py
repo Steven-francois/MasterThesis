@@ -93,8 +93,8 @@ def Y_coord_to_pixel(y):
 
 if __name__ == '__main__':
     # Read the data
-    image_folder = 'Fusion/data/31/camera/'
-    lidar_file = 'Fusion/data/31/lidar_combined'
+    image_folder = 'Fusion/data/2/camera/'
+    lidar_file = 'Fusion/data/2/lidar_combined'
     lidar_data_file = f"{lidar_file}_data.npy"
     lidar_ts_file = f"{lidar_file}_ts.npy"
     lidar_timestamps = np.load(lidar_ts_file, allow_pickle=True)

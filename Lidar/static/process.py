@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 import os
 from Lidar.static.background import remove_background_with_voxels, remove_close_points
 
-start_time, end_time  ="2025-05-14_14-13-23-147628", "2025-05-14_14-13-31-283810"
+start_time, end_time  ="2025-05-14_14-08-15-875622", "2025-05-14_14-08-52-842995"
 
-nb = "1_2"
+nb = "11_1"
 data_folder = f"Data/{nb}/"
 lidar_data_file = os.path.join(data_folder, "lidar_combined_data.npy")
 lidar_ts_file = os.path.join(data_folder, "lidar_combined_ts.npy")

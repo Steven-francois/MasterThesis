@@ -68,18 +68,18 @@ if __name__ == "__main__":
 
     fig = plt.figure()
     gs = gridspec.GridSpec(2,3)
-    gs.update(wspace=1, hspace=1)
+    gs.update(wspace=0.3, hspace=0.2)
     ax1 = plt.subplot(gs[0, 0])
     ax2 = plt.subplot(gs[0, 1])
     ax3 = plt.subplot(gs[0, 2])
     ax4 = plt.subplot(gs[1, :])
     img = ax1.imshow(np.zeros(image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
-    ax1.set_title("Range-Doppler Map w/ bg")
+    ax1.set_title("Raw Range-Doppler Map")
     ax1.set_xlabel("Doppler (m/s)")
     ax1.set_ylabel("Range (m)")
     ax1.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
     img2 = ax2.imshow(np.zeros(image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
-    scat2 = ax2.scatter([], [], marker='o', color='r')
+    # scat2 = ax2.scatter([], [], marker='o', color='r')
     ax2.set_title("Range-Doppler Map w/o bg")
     ax2.set_xlabel("Doppler (m/s)")
     ax2.set_ylabel("Range (m)")
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     ax3.set_ylabel("Range (m)")
     ax3.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
     img4 = ax4.imshow(np.zeros(resolved_image_size), vmin=0, vmax=200, aspect='auto', cmap='jet', origin='lower')
-    ax4.set_title("Resolved Range-Doppler Map")
+    ax4.set_title("Resolved Range-Doppler Map w/o bg")
     ax4.set_xlabel("Doppler (m/s)")
     ax4.set_ylabel("Range (m)")
     ax4.set(xlim=(xmin, xmax), ylim=(ymin, ymax))
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
         img3.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-        ax1.set_title(f"Image {frame}")
+        # ax1.set_title(f"Image {frame}")
         
         cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
         r_targets = doppler_resolution(cfar_targets, targets_data, nb_bands)
@@ -150,7 +150,7 @@ if __name__ == "__main__":
             r.append(r_range)
             s.append(r_doppler)
         data = np.stack([s,r]).T
-        scat2.set_offsets(data)
+        # scat2.set_offsets(data)
         
         r_rdm = doppler_reconstruct(range_doppler_matrix, targets_data, nb_bands, properties)
         r_rdm = np.abs(r_rdm)
@@ -159,13 +159,13 @@ if __name__ == "__main__":
         xt_left = xt_left - nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
         xt_right = xt_right + nb_bands * DOPPLER_RESOLUTION * N_DOPPLER_BINS
         img4.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-        ax4.set_title(f"Resolved Image {frame}")
+        # ax4.set_title(f"Resolved Image {frame}")
         return img, img2
 
 # if __name__ == "__main__":
-    rdc_reader.load("Data/1_0/radar_cube_data")
+    rdc_reader.load("Data/11_0/radar_cube_data")
     print(rdc_reader.timestamps[0], rdc_reader.timestamps[-1])
-    can_reader.load_npy("Data/1_0/radar_can_data.npy")
+    can_reader.load_npy("Data/11_0/radar_can_data.npy")
     print(can_reader.can_targets[0].targets_header.real_time, can_reader.can_targets[-1].targets_header.real_time)
     can_reader.filter_targets_speed(1, 200)
     # can_reader.cluster_with_dbscan(2,2)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     img.set_extent([xt_left, xt_right, yt_bottom, yt_top])
     img2.set_extent([xt_left, xt_right, yt_bottom, yt_top])
     img3.set_extent([xt_left, xt_right, yt_bottom, yt_top])
-    ax1.set_title(f"Image {frame}")
+    # ax1.set_title(f"Image {frame}")
     
     cfar_targets = extract_targets(range_doppler_matrix, mask, properties)
     print(cfar_targets)
@@ -253,7 +253,7 @@ if __name__ == "__main__":
         s.append(point['closest_point']['doppler'])
         v.append(point['closest_point']['rcs'])
     data = np.stack([s,r]).T
-    scat2.set_offsets(data)
-    scat2.set_array(np.array(v))
+    # scat2.set_offsets(data)
+    # scat2.set_array(np.array(v))
     
     plt.show()

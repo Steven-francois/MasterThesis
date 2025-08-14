@@ -5,9 +5,9 @@ from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacket
 from Radar.RadarCanReader import RadarCanReader
 from Radar.cfar import cfar
 
-nb_file = "41"
-rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
-can_file = f"Fusion/data/can_data_{nb_file}.npy" # Replace with your output file path
+nb_file = "2"
+rdc_file = f"Fusion/data/{nb_file}/radar_cube_data" # Replace with your output file path
+can_file = f"Fusion/data/{nb_file}/radar_can_data.npy" # Replace with your output file path
 
 packetReader = RadarPacketReader("Radar/captures/radar_log_21.pcapng", rdc_file)
 packetReader.load()
