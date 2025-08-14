@@ -12,7 +12,7 @@ def read_radar_data(eth_file, rdc_file, can_file, can_output_file):
     del rdc_reader, canReader
 
 if __name__ == "__main__":
-    name = "1"
+    name = "21"
     main_folder = "Fusion/static/DATA_20250514_140309/"
     print(f"Main folder: {main_folder}")
     for i, folder in enumerate(os.listdir(main_folder)):
@@ -31,3 +31,4 @@ if __name__ == "__main__":
             
             # Read radar data
             read_radar_data(eth_file, rdc_file, can_file, can_output_file)
+        exit()

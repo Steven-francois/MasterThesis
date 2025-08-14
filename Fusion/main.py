@@ -41,7 +41,7 @@ def filter_radar_images(eth_file, rdc_file, can_output_file, image_folder, new_i
     canReader.save_npy(can_output_file)
 
 if __name__ == "__main__":
-    name = "1"
+    name = "31"
     main_folder = "Fusion/static/DATA_20250514_140309/"
     print(f"Main folder: {main_folder}")
     for i, folder in enumerate(os.listdir(main_folder)):
@@ -75,3 +75,4 @@ if __name__ == "__main__":
             
             # Combine LiDAR and speed data based on image timestamps
             combine_lidar_speed(lidar_npy_file, new_image_folder, combined_lidar_npy_file, speed_file)
+        exit()

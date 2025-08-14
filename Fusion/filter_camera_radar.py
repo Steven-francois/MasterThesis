@@ -25,6 +25,7 @@ def filter(rdc_reader, image_folder, new_image_folder):
     radar_times = rdc_reader.time
     radar_timestamps = radar_timestamps - radar_timestamps[0]
     radar_timestamps += radar_times[0] - 55/1.0e3
+    # radar_timestamps += radar_times[0] # to test misalignment
 
     # Load image data
     image_filenames = os.listdir(image_folder)
