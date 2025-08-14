@@ -5,9 +5,9 @@ from filterpy.kalman import KalmanFilter
 # --- Gating configuration (tunable) ---
 # Base threshold and growth rate per second for time-since-update aware gating.
 # Effective threshold = BASE * (1 + GROWTH_PER_SEC * track.time_since_update)
-GATE_BASE_RADAR = 6.0
+GATE_BASE_RADAR = 5.0
 GATE_GROWTH_PER_SEC_RADAR = 100.0
-GATE_BASE_LIDAR = 5.0
+GATE_BASE_LIDAR = 10.0
 GATE_GROWTH_PER_SEC_LIDAR = 5.0
 
 # --- Fusion configuration (tunable) ---
@@ -20,6 +20,7 @@ def _robust_normalize(C: np.ndarray, eps: float = 1e-6) -> np.ndarray:
     If no finite entries exist, returns the input unchanged.
     """
     C = C.copy()
+    return C
     finite_mask = np.isfinite(C)
     if not np.any(finite_mask):
         return C  # nothing to normalize
@@ -41,6 +42,7 @@ class Track:
         self.nbs = [nb]
         self.time_since_update = 0.0
         self.last_update_time = ts
+        self.count_unupdated = -1
 
         # Store last known measurements
         self.radar_coord = detection[2] if len(detection) > 2 else None
@@ -104,6 +106,7 @@ class Track:
         # Always use Kalman prediction per sensor; kalman flag kept for API compatibility
         dt = new_timestamp - self.last_update_time
         self.time_since_update = dt
+        self.count_unupdated +=1
 
         pred = {"timestamp": new_timestamp}
 
@@ -125,13 +128,12 @@ class Track:
 
     def update(self, detection, ts, nb):
         # Bookkeeping
-        # self.history.append(detection)
-        kf_detection = [[], self.lidar_kf.x[::2].reshape(-1) if self.lidar_kf is not None else [], self.radar_kf.x.reshape(-1) if self.radar_kf is not None else []]
-        self.history.append(kf_detection)
+        self.history.append(detection)
         self.history_ts.append(ts)
         self.nbs.append(nb)
         self.time_since_update = 0.0
         self.last_update_time = ts
+        self.count_unupdated = -1
 
         # Update radar KF if measurement available
         if len(detection) > 2 and detection[2] is not None and self.radar_kf is not None:
@@ -160,7 +162,12 @@ def compute_cost(tracks, detections, lidar=False):
                 if pred_coord is None or meas is None:
                     cost[i, j] = np.inf
                 else:
-                    cost[i, j] = np.linalg.norm(np.array(pred_coord) - np.array(meas))
+                    if lidar:
+                        cost[i, j] = np.linalg.norm(np.array(pred_coord) - np.array(meas))
+                    else:
+                        dist = np.array(pred_coord) - np.array(meas)
+                        dist[1] = dist[1] / 50
+                        cost[i, j] = np.linalg.norm(dist)
             except Exception:
                 # Any shape/index issues -> disallow this pair
                 cost[i, j] = np.inf
@@ -186,9 +193,9 @@ def associate_tracks_and_detections(tracks, detections, max_age=5, lidar=False, 
         C_l = compute_cost(tracks, detections, lidar=True)
 
         # Build per-modality time-aware gates (track-wise scalar per row)
-        gates_r = np.array([GATE_BASE_RADAR * (1.0 + GATE_GROWTH_PER_SEC_RADAR * t.time_since_update)
+        gates_r = np.array([GATE_BASE_RADAR * (1.0 + GATE_GROWTH_PER_SEC_RADAR * t.time_since_update * (t.count_unupdated>0))
                             for t in tracks], dtype=float)
-        gates_l = np.array([GATE_BASE_LIDAR * (1.0 + GATE_GROWTH_PER_SEC_LIDAR * t.time_since_update)
+        gates_l = np.array([GATE_BASE_LIDAR * (1.0 + GATE_GROWTH_PER_SEC_LIDAR * t.time_since_update * (t.count_unupdated>0))
                             for t in tracks], dtype=float)
 
         # Apply gating: disallow pairs where cost exceeds modality gate
@@ -202,7 +209,7 @@ def associate_tracks_and_detections(tracks, detections, max_age=5, lidar=False, 
         C_ln = _robust_normalize(C_l_f)
 
         # Fuse via weighted sum; if any modality disallowed, keep inf
-        C_fused = FUSE_WEIGHT_RADAR * C_rn + FUSE_WEIGHT_LIDAR * C_ln
+        C_fused = (FUSE_WEIGHT_RADAR * C_rn + FUSE_WEIGHT_LIDAR * C_ln) / (FUSE_WEIGHT_RADAR + FUSE_WEIGHT_LIDAR)
         C_fused[~np.isfinite(C_r_f) | ~np.isfinite(C_l_f)] = np.inf
 
         cost_matrix = C_fused
@@ -232,9 +239,9 @@ def associate_tracks_and_detections(tracks, detections, max_age=5, lidar=False, 
         else:
             # Time-since-update aware gating: threshold grows with how long a track hasn't been updated.
             if lidar:
-                gate = GATE_BASE_LIDAR * (1.0 + GATE_GROWTH_PER_SEC_LIDAR * tracks[i].time_since_update)
+                gate = GATE_BASE_LIDAR * (1.0 + GATE_GROWTH_PER_SEC_LIDAR * tracks[i].time_since_update * (tracks[i].count_unupdated>0))
             else:
-                gate = GATE_BASE_RADAR * (1.0 + GATE_GROWTH_PER_SEC_RADAR * tracks[i].time_since_update)
+                gate = GATE_BASE_RADAR * (1.0 + GATE_GROWTH_PER_SEC_RADAR * tracks[i].time_since_update * (tracks[i].count_unupdated>0))
 
             if cost_matrix[i, j] < gate:
                 matches.append((i, j))
@@ -266,12 +273,12 @@ if __name__ == "__main__":
                 frame_data = json.load(json_file)
                 frames.append(frame_data)
 
-    tracking_interval = slice(300, 435)
+    # tracking_interval = slice(300, 560)
     # tracking_interval = slice(2500, 2800)
     # tracking_interval = slice(2500, 2600)
     # tracking_interval = slice(3228, 3300)
-    # tracking_interval = slice(0, 450)
-    # tracking_interval =  slice(2500, 3000)
+    tracking_interval = slice(1204, 1241)
+    # tracking_interval = slice(2541, 2582)
     
     tracks = []
     old_tracks = []
@@ -310,6 +317,25 @@ if __name__ == "__main__":
         # plt.plot(preds[:, 0], preds[:, 1], linestyle='-', label=f'Predicted {track.id} (old)', alpha=0.5)
     plt.xlabel('range coordinate (m)')
     plt.ylabel('Doppler coordinate (m/s)')
+    plt.title('Tracked Targets Over Time (Radar)')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    plt.figure(figsize=(10, 6))
+    for track in tracks:
+        coords = np.array([detection[1] for detection in track.history])
+        preds = np.array(track.lidar_predictions)
+        # print(f"Track {track.id} history: {coords} ts: {track.history_ts}")
+        # print(f"Track {track.id} predictions: {preds}")
+        plt.plot(coords[:, 0], coords[:, 2], marker='o', label=f'Track {track.id}')
+        # plt.plot(preds[:, 0], preds[:, 2], linestyle='-', label=f'Predicted {track.id}')
+    for track in old_tracks:
+        coords = np.array([detection[1] for detection in track.history])
+        preds = np.array(track.lidar_predictions)
+        plt.plot(coords[:, 0], coords[:, 2], marker='o', label=f'Track {track.id}')
+        # plt.plot(preds[:, 0], preds[:, 2], linestyle='-', label=f'Predicted {track.id} (old)', alpha=0.5)
+    plt.xlabel('x coordinate (m)')
+    plt.ylabel('y coordinate (m)')
     plt.title('Tracked Targets Over Time (Radar)')
     plt.legend()
     plt.grid()
@@ -363,11 +389,8 @@ if __name__ == "__main__":
     plt.xlabel('x coordinate (m)')
     plt.ylabel('y coordinate (m)')
     plt.title('Tracked Targets Over Time (LiDAR)')
-    plt.xlim(0, 130)
-    plt.ylim(-1, 4)
     plt.legend()
     plt.grid()
-    plt.savefig("tracked_targets_lidar.png", transparent=True)
     plt.show()
 
 
@@ -407,25 +430,6 @@ if __name__ == "__main__":
         # plt.plot(preds[:, 0], preds[:, 2], linestyle='-', label=f'Predicted {track.id} (old)', alpha=0.5)
     plt.xlabel('x coordinate (m)')
     plt.ylabel('y coordinate (m)')
-    plt.title('Tracked Targets Over Time (Fusion)')
-    plt.legend()
-    plt.grid()
-    plt.show()
-    plt.figure(figsize=(10, 6))
-    for track in tracks_fusion:
-        coords = np.array([detection[2] for detection in track.history])
-        preds = np.array(track.radar_predictions)
-        # print(f"Track {track.id} history: {coords}")
-        print(f"Track {track.id} predictions: {preds}")
-        plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
-        # plt.plot(preds[:, 0], preds[:, 1], linestyle='-', label=f'Predicted {track.id}') if len(preds) > 0 else None
-    for track in old_tracks_fusion:
-        coords = np.array([detection[2] for detection in track.history])
-        preds = np.array(track.radar_predictions)
-        plt.plot(coords[:, 0], coords[:, 1], marker='o', label=f'Track {track.id}')
-        # plt.plot(preds[:, 0], preds[:, 1], linestyle='-', label=f'Predicted {track.id} (old)', alpha=0.5)
-    plt.xlabel('Range coordinate (m)')
-    plt.ylabel('Doppler coordinate (m/s)')
     plt.title('Tracked Targets Over Time (Fusion)')
     plt.legend()
     plt.grid()

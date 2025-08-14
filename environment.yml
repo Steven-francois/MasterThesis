@@ -11,4 +11,5 @@ dependencies:
   - pip :
     - open3d
     - bitstruct
-    - sklearn
+    - scikit-learn
+    - filterpy
