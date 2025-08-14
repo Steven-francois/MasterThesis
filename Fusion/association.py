@@ -141,7 +141,7 @@ if __name__ == "__main__":
             radar_targets = radar_frame["targets"]
         lidar_frame = lidar_frames[nb_frame]
         nb_lidar_targets = int(np.max(lidar_frame[:, 3]))+1 if len(lidar_frame) > 0 else 0
-        lidar_targets = np.zeros((nb_lidar_targets, 3))
+        lidar_targets_center = np.zeros((nb_lidar_targets, 3))
         for i in range(nb_lidar_targets):
             lidar_points = lidar_frame[lidar_frame[:, 3] == i, :3]
             # Calculate center of rectangle for LiDAR targets
@@ -152,28 +152,28 @@ if __name__ == "__main__":
             mean_x = (min_x + max_x) / 2
             mean_y = (min_y + max_y) / 2
             mean_z = np.mean(lidar_points[:, 2])
-            lidar_targets[i, 0] = mean_x
-            lidar_targets[i, 1] = mean_y
-            lidar_targets[i, 2] = mean_z
+            lidar_targets_center[i, 0] = mean_x
+            lidar_targets_center[i, 1] = mean_y
+            lidar_targets_center[i, 2] = mean_z
             # Calculate center of mass for LiDAR targets
             # lidar_targets[i, :3] = np.mean(lidar_frame[lidar_frame[:, 3] == i, :3], axis=0)
         # Convert lidar targets coordinate to camera perspective
         # lidar_targets += np.array([0, 0, -1.73])  # Adjust for the height of the LiDAR sensor
         cam_coords = np.array([to_cam_coord(target, cam_size, cam_fov) for target in cam_frame])
-        lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets])
+        lidar_coords = np.array([to_lidar_coord(target[:3]) for target in lidar_targets_center])
         radar_coords = np.array([to_radar_coord(target) for target in radar_targets])
 
         if SAVE:
             targets_nb, match_CL, match_RL = match_modalities(cam_coords, lidar_coords, radar_coords)
             cam_targets = cam_coords[targets_nb[:, 0]].tolist() if len(targets_nb) > 0 else []
-            lidar_targets = lidar_coords[targets_nb[:, 1]].tolist() if len(targets_nb) > 0 else []
+            lidar_targets = lidar_targets_center[targets_nb[:, 1]].tolist() if len(targets_nb) > 0 else []
             radar_targets = radar_coords[targets_nb[:, 2]].tolist() if len(targets_nb) > 0 else []
             targets = list(zip(cam_targets, lidar_targets, radar_targets))
             cam_cl_targets = cam_coords[match_CL[:, 0]].tolist() if len(match_CL) > 0 else []
-            lidar_cl_targets = lidar_coords[match_CL[:, 1]].tolist() if len(match_CL) > 0 else []
+            lidar_cl_targets = lidar_targets_center[match_CL[:, 1]].tolist() if len(match_CL) > 0 else []
             cl_targets = list(zip(cam_cl_targets, lidar_cl_targets))
             radar_rl_targets = radar_coords[match_RL[:, 0]].tolist() if len(match_RL) > 0 else []
-            lidar_rl_targets = lidar_coords[match_RL[:, 1]].tolist() if len(match_RL) > 0 else []
+            lidar_rl_targets = lidar_targets_center[match_RL[:, 1]].tolist() if len(match_RL) > 0 else []
             rl_targets = list(zip(radar_rl_targets, lidar_rl_targets))
             np.save(f, targets_nb, allow_pickle=True)
             np.save(f, match_CL, allow_pickle=True)
