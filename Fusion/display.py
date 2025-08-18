@@ -8,6 +8,7 @@ from Radar.RadarPacketPcapngReader import RadarPacketPcapngReader as RadarPacket
 import open3d as o3d
 import pandas as pd
 from scipy.interpolate import CubicSpline
+from Fusion.PauseAnimation import PauseAnimation
 
 nb_file = "11_0"
 # data_folder = f"Data/{nb_file}/"
@@ -362,6 +363,7 @@ def update_old(frame):
 
 def animate():
     ani = animation.FuncAnimation(fig, update, frames=len(image_filenames), interval=10)
+    pa = PauseAnimation(fig, ani)
     plt.show()
 
 def save():

@@ -6,6 +6,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import open3d as o3d
 from Fusion.association import to_cam_coord, to_lidar_coord, to_radar_coord, cam_size, cam_fov
+from Fusion.PauseAnimation import PauseAnimation
 
 
 nb = "x1_0"
@@ -283,6 +284,7 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
     ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
     # ani = animation.FuncAnimation(fig, update, frames=range(300, 560), interval=delay * 1000)
     # ani = animation.FuncAnimation(fig, update, frames=range(1204, 1241), interval=delay * 1000)
+    pa = PauseAnimation(fig, ani)
     plt.show()
     
 if __name__ == "__main__":
