@@ -12,8 +12,8 @@ from tqdm import trange
 # results = model.train(data="coco8.yaml", epochs=100, imgsz=640)
 
 nb = "21_0"
-data_folder = f"Data/{nb}/"
-# data_folder = f"D:/p_{nb}/"
+# data_folder = f"Data/{nb}/"
+data_folder = f"D:/p_{nb}/"
 image_folder = os.path.join(data_folder, "camera")
 image_filenames = sorted(os.listdir(image_folder))
 images = [os.path.join(image_folder, filename) for filename in image_filenames]
@@ -29,9 +29,9 @@ tracking_intervals = [
         # slice(3587, 3624),
         # slice(3869, 3942),
         # slice(4119, 4442)
-        # slice(2500, 2600)
+        slice(2500, 2600)
         # slice(300, 540)
-        slice(0, len(images))
+        # slice(0, len(images))
     ]
 # tracking_intervals = [
 #         slice(745, 816),
@@ -53,7 +53,7 @@ for interval in tracking_intervals:
     model = YOLO("yolov9e.pt")
     ids = []
     for i in range(interval.start, interval.stop):
-        result = model.track(images[i], persist=True, classes=[0,1,2,3,5,7], show=False, tracker="botsort_reid.yaml", save=False)[0]
+        result = model.track(images[i], persist=True, classes=[0,1,2,3,5,7], show=True, conf=0.01, tracker="botsort_reid.yaml", save=False)[0]
         # result = model.predict(images[i], classes=[0,1,2,3,5,7], show=False, save=True)[0]
         if result.boxes is not None:
             if result.boxes.id is not None:

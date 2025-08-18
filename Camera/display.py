@@ -43,7 +43,9 @@ def display_images_as_animation(folder_path, delay=1):
         # slice(3869, 3942),
         # slice(4119, 4442),
         # slice(2500, 2800)
-        slice(2500, 3000)
+        # slice(2500, 3000)
+        slice(460, 470)
+        # slice(0, len(image_files))
     ]
     # tracking_intervals = [
     #     slice(745, 816),
@@ -74,6 +76,6 @@ def display_images_as_animation(folder_path, delay=1):
     plt.show()
 
 # Replace 'your_folder_path' with the path to your folder containing images
-folder_path = 'Data/11_0/cam_targets/targets'
-# folder_path = 'D:/p_11_0/cam_targets/targets'
+# folder_path = 'Data/11_0/cam_targets/targets'
+folder_path = 'D:/p_21_0/cam_targets/targets'
 display_images_as_animation(folder_path, delay=0.06)

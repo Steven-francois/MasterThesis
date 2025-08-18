@@ -12,8 +12,8 @@ model = YOLO("yolov9e.pt")
 # results = model.train(data="coco8.yaml", epochs=100, imgsz=640)
 
 nb = "21_0"
-data_folder = f"Data/{nb}/"
-# data_folder = f"D:/p_{nb}/"
+# data_folder = f"Data/{nb}/"
+data_folder = f"D:/p_{nb}/"
 image_folder = os.path.join(data_folder, "camera")
 image_filenames = sorted(os.listdir(image_folder))
 images = [os.path.join(image_folder, filename) for filename in image_filenames]
