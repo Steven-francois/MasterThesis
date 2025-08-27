@@ -9,7 +9,7 @@ from Fusion.association import to_cam_coord, to_lidar_coord, to_radar_coord, cam
 from Fusion.PauseAnimation import PauseAnimation
 
 
-nb = "x1_0"
+nb = "21_0"
 # data_folder = f"Data/{nb}/"
 data_folder = f"D:/p_{nb}/"
 camera_folder = os.path.join(data_folder, "camera")
@@ -33,12 +33,12 @@ with open(os.path.join(fusion_folder, "targets.npy"), "rb") as f:
         fusion_frames.append(np.load(f, allow_pickle=True))
         CL_frames.append(np.load(f, allow_pickle=True))
         RL_frames.append(np.load(f, allow_pickle=True))
-# with open(os.path.join(fusion_folder, "tracks_lidar.npy"), "rb") as f:
-#     frame_slice = np.load(f, allow_pickle=True).tolist()
-#     num_frames = frame_slice.stop - frame_slice.start
-#     track_ids = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
+with open(os.path.join(fusion_folder, "tracks_fusion.npy"), "rb") as f:
+    frame_slice = np.load(f, allow_pickle=True).tolist()
+    num_frames = frame_slice.stop - frame_slice.start
+    track_ids = [np.load(f, allow_pickle=True) for _ in range(num_frames)]
 
-track_ids = None
+# track_ids = None
 
 
 def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, track_ids, track_display=False, error_display=False, delay=0.1):
@@ -104,9 +104,8 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
 
         fusion_frame = fusion_frames[frame]
         nb_targets = fusion_frame.shape[0]
-        nb_tracks = len(track_id)
+        nb_tracks = len(track_ids[-1]) if (track_display and in_track_frame) else 0
         cam_idx, lidar_idx, radar_idx = fusion_frame.T.astype(int)
-        print(cam_idx, lidar_idx, radar_idx)
         colors = plt.get_cmap("tab10")(np.arange(nb_targets) / nb_targets) if nb_targets > 0 else np.array([[0, 0, 0, 0]])
         colors_tracks = plt.get_cmap("tab10")(np.arange(nb_tracks) / nb_tracks) if nb_tracks > 0 else np.array([[0, 0, 0, 0]])
         CL_frame = CL_frames[frame]
@@ -147,6 +146,7 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
                             if current_track_id != -1:
                                 edgecolor = colors_tracks[current_track_id]
                                 ax_cam.text(x, y, f'Target {current_track_id}', color=edgecolor, fontsize=8)
+                                print(current_track_id, len(colors_tracks))
                 else:
                     if i in cam_idx:
                         idx = np.where(cam_idx == i)[0][0]
@@ -281,14 +281,14 @@ def display_fusion_animation(cam_filenames, cam_frames, lidar_frames, radar_fold
             ax_radar_error.legend()
         
     
-    ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
+    # ani = animation.FuncAnimation(fig, update, frames=len(fusion_frames), interval=delay * 1000)
     # ani = animation.FuncAnimation(fig, update, frames=range(300, 560), interval=delay * 1000)
-    # ani = animation.FuncAnimation(fig, update, frames=range(1204, 1241), interval=delay * 1000)
+    ani = animation.FuncAnimation(fig, update, frames=range(2500, 2600), interval=delay * 1000)
     pa = PauseAnimation(fig, ani)
     plt.show()
     
 if __name__ == "__main__":
-    display_fusion_animation(image_files, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, track_ids, delay=0.1, track_display=False, error_display=True)
+    display_fusion_animation(image_files, cam_frames, lidar_frames, radar_folder, fusion_frames, CL_frames, RL_frames, track_ids, delay=0.1, track_display=True, error_display=True)
     
     # Optionally save the animation as a video
     # ani.save('fusion_animation.mp4', writer='ffmpeg', fps=10)

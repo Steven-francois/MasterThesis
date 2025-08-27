@@ -228,7 +228,7 @@ if __name__ == "__main__":
     import json
     from tqdm import tqdm
     
-    nb = "x1_0"
+    nb = "21_0"
     data_folder = f"Data/{nb}/"
     data_folder = f"D:/p_{nb}/"
     fusion_folder = os.path.join(data_folder, "fusion")
@@ -414,22 +414,32 @@ if __name__ == "__main__":
     old_tracks_fusion = []
     max_age = 100
     Track.count = 0  # Reset track count for Fusion tracks
+    with open(os.path.join(fusion_folder, "tracks_fusion.npy"), "wb") as f:
+        ti = np.array(tracking_interval)
+        np.save(f, ti)
 
-    for frame_idx, detections in tqdm(enumerate(frames[tracking_interval]), desc="Tracking Progress"):
-        matches, unmatched_tracks, unmatched_dets = associate_tracks_and_detections(tracks_fusion, detections, max_age, False, True, cam_ids[frame_idx] if len(cam_ids) > 0 else None)
+        for frame_idx, detections in tqdm(enumerate(frames[tracking_interval]), desc="Tracking Progress"):
+            matches, unmatched_tracks, unmatched_dets = associate_tracks_and_detections(tracks_fusion, detections, max_age, False, True, cam_ids[frame_idx] if len(cam_ids) > 0 else None)
+            tracks_dets = np.zeros(Track.count, dtype=int)
+            tracks_dets[:] = -1
 
-        # Update matched tracks
-        for i, j in matches:
-            tracks_fusion[i].update(detections["targets"][j], detections["timestamp"], j, cam_ids[frame_idx][j] if len(cam_ids[frame_idx]) > 0 else None)
+            # Update matched tracks
+            for i, j in matches:
+                tracks_fusion[i].update(detections["targets"][j], detections["timestamp"], j, cam_ids[frame_idx][j] if len(cam_ids[frame_idx]) > 0 else None)
+                tracks_dets[tracks_fusion[i].id] = j
 
-        # Create new tracks for unmatched detections
-        for j in unmatched_dets:
-            new_track = Track(detections["targets"][j], detections["timestamp"], j, cam_ids[frame_idx][j] if len(cam_ids[frame_idx]) > 0 else None)
-            tracks_fusion.append(new_track)
+            # Create new tracks for unmatched detections
+            for j in unmatched_dets:
+                new_track = Track(detections["targets"][j], detections["timestamp"], j, cam_ids[frame_idx][j] if len(cam_ids[frame_idx]) > 0 else None)
+                tracks_fusion.append(new_track)
+                tracks_dets = np.append(tracks_dets, j)
 
-        # Remove old tracks
-        old_tracks_fusion.extend([track for track in tracks_fusion if track.time_since_update > max_age])
-        tracks_fusion = [track for track in tracks_fusion if track.time_since_update <= max_age]
+            # Remove old tracks
+            old_tracks_fusion.extend([track for track in tracks_fusion if track.time_since_update > max_age])
+            tracks_fusion = [track for track in tracks_fusion if track.time_since_update <= max_age]
+
+            np.save(f, tracks_dets)
+
     plt.figure(figsize=(10, 6))
     for track in tracks_fusion:
         coords = np.array([detection[1] for detection in track.history])
