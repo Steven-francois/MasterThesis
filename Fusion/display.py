@@ -10,9 +10,9 @@ import pandas as pd
 from scipy.interpolate import CubicSpline
 from Fusion.PauseAnimation import PauseAnimation
 
-nb_file = "11_0"
-# data_folder = f"Data/{nb_file}/"
-data_folder = f"D:/{nb_file}/"
+nb_file = "21_0"
+data_folder = f"Data/{nb_file}/"
+# data_folder = f"D:/{nb_file}/"
 image_folder = f"{data_folder}camera/"
 rdc_file = f"{data_folder}radar_cube_data" # Replace with your output file path
 plot_folder = f"Fusion/plots/{nb_file}"
@@ -21,13 +21,7 @@ lidar_data_file = f"{lidar_file}_data.npy"
 lidar_ts_file = f"{lidar_file}_ts.npy"
 # speed_file = f'{data_folder}speed_test.csv'
 speed_file = None
-# rdc_file = f"Fusion/data/radar_cube_data_{nb_file}" # Replace with your output file path
-# image_folder = f"Fusion/data/camera_{nb_file}/"
-# plot_folder = f"Fusion/plots/fusion{nb_file}"
-# lidar_file = f"Fusion/data/combination_20250312_123525_2"
-# lidar_data_file = f"{lidar_file}_data.npy"
-# lidar_ts_file = f"{lidar_file}_ts.npy"
-# speed_file = f'Fusion/captures30/speed_test.csv'
+
 
 image_filenames = os.listdir(image_folder)
 images_timestamps = np.array([datetime.strptime(filename.split(".")[0], "%Y-%m-%d_%H-%M-%S-%f").timestamp() for filename in image_filenames])
@@ -147,18 +141,23 @@ global_max_intensity = max([max(lidar_frame[:, 3]) for lidar_frame in lidar_fram
 
 vis = o3d.visualization.Visualizer()
 vis.create_window()
-front = [ -0.92541657839832347, 0.1631759111665346, 0.34202014332566871 ]
-lookat = [ 16.341000000000001, -5.8939999999999992, -0.38849999999999996 ]
-up = [ 0.33682408883346515, -0.059391174613884559, 0.93969262078590854 ]
+# front = [ -0.92541657839832347, 0.1631759111665346, 0.34202014332566871 ]
+# lookat = [ 16.341000000000001, -5.8939999999999992, -0.38849999999999996 ]
+# up = [ 0.33682408883346515, -0.059391174613884559, 0.93969262078590854 ]
+front = [ -0.9326078418188869, 0.3123735202522317, 0.18073571097917229 ]
+lookat = [ 17.454287688653686, -2.4854367385560887, -0.53503482810538938 ]
+up = [ 0.18182407773931314, -0.025901098166704554, 0.98298989713425189 ]
+zoom = 0.079999999999999835
 
 geometry = o3d.geometry.PointCloud()
 frame_data = lidar_frames[0]
 points = frame_data[:, :3]
+points = np.concatenate([frame[:, :3] for frame in lidar_frames if len(frame) > 0], axis=0)
 intensity = frame_data[:, 3]
 geometry.points = o3d.utility.Vector3dVector(points)
 intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
 colors = plt.cm.viridis(intensity_normalized)[:, :3]  # Use viridis colormap
-geometry.colors = o3d.utility.Vector3dVector(colors)
+# geometry.colors = o3d.utility.Vector3dVector(colors)
 vis.add_geometry(geometry)
 
 def degree_to_pixel(degree):
@@ -171,6 +170,7 @@ vc = vis.get_view_control()
 vc.set_front(front)
 vc.set_lookat(lookat)
 vc.set_up(up)
+vc.set_zoom(zoom)
 vis.poll_events()
 vis.update_renderer()
 
@@ -226,11 +226,12 @@ def update(frame):
     geometry.points = o3d.utility.Vector3dVector(points)
     intensity_normalized = (intensity - global_min_intensity) / (global_max_intensity - global_min_intensity)
     colors = plt.cm.viridis(intensity_normalized)[:, :3]
-    geometry.colors = o3d.utility.Vector3dVector(colors)
-    vc.set_front(front)
-    vc.set_lookat(lookat)
-    vc.set_up(up)
-    vis.add_geometry(geometry)
+    # geometry.colors = o3d.utility.Vector3dVector(colors)
+    # vc.set_front(front)
+    # vc.set_lookat(lookat)
+    # vc.set_up(up)
+    # vis.add_geometry(geometry)
+    vis.update_geometry(geometry)
     vis.poll_events()
     vis.update_renderer()
     
